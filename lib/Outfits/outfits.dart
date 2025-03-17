@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'createOutfit.dart';
 import 'itemSelection.dart';
 import 'createPalette.dart';
+import 'package:drobe/models/item.dart'; // ensure Item is imported
 
 class OutfitsPage extends StatefulWidget {
   const OutfitsPage({Key? key}) : super(key: key);
@@ -17,6 +18,9 @@ class _OutfitsPageState extends State<OutfitsPage> {
   int _currentOutfitIndex = 0;
   bool _isEditing = false;
 
+  // Outfits stored by normalized date.
+  // Each outfit is stored as a Map containing:
+  //   'name': String, 'clothes': Map<String, String?>, 'accessories': List<String?>
   final Map<DateTime, List<Map<String, dynamic>>> outfitsPerDay = {};
 
   @override
@@ -25,10 +29,12 @@ class _OutfitsPageState extends State<OutfitsPage> {
     super.dispose();
   }
 
+  // Normalize date (remove time)
   DateTime _normalizeDate(DateTime date) {
     return DateTime(date.year, date.month, date.day);
   }
 
+  // Format date for display
   String _getFormattedDate(DateTime date) {
     return DateFormat('EEEE, d MMMM y').format(date);
   }
@@ -41,7 +47,11 @@ class _OutfitsPageState extends State<OutfitsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OUTFITS'),
+        // Show outfit name if available; otherwise, static title.
+        title: Text(
+               'OUTFITS',
+          style: const TextStyle(fontFamily: 'Avenir', fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -58,6 +68,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Toggle edit mode.
               FloatingActionButton(
                 heroTag: 'editBtn',
                 backgroundColor: Colors.grey,
@@ -67,10 +78,11 @@ class _OutfitsPageState extends State<OutfitsPage> {
                   });
                 },
                 child: Icon(
-                  _isEditing ? Icons.close : Icons.edit,
+                  _isEditing ? Icons.cancel : Icons.edit,
                   color: Colors.black,
                 ),
               ),
+              // Add new outfit.
               FloatingActionButton(
                 heroTag: 'addBtn',
                 backgroundColor: Colors.grey,
@@ -84,13 +96,14 @@ class _OutfitsPageState extends State<OutfitsPage> {
 
                   if (newOutfit != null) {
                     setState(() {
-                      DateTime outfitDate = _normalizeDate(newOutfit.date);
+                      DateTime outfitDate = _normalizeDate(selectedDate); // Ensure outfit is assigned to the correct date
 
                       if (!outfitsPerDay.containsKey(outfitDate)) {
                         outfitsPerDay[outfitDate] = [];
                       }
 
                       outfitsPerDay[outfitDate]!.add({
+                        'name': newOutfit.name,
                         'clothes': newOutfit.clothes,
                         'accessories': newOutfit.accessories,
                       });
@@ -98,8 +111,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
                   }
                 },
                 child: const Icon(Icons.add, color: Colors.black),
-              ),
-            ],
+              ),            ],
           ),
         ),
       ),
@@ -107,6 +119,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 132),
         child: Column(
           children: [
+            // Date selector row.
             Center(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -165,13 +178,22 @@ class _OutfitsPageState extends State<OutfitsPage> {
                 child: outfitCount > 0
                     ? Column(
                   children: [
+                    // Header displaying the outfit's name and index.
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('OUTFITS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        Text('${_currentOutfitIndex + 1}/$outfitCount', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(
+                          outfitsForSelectedDate[_currentOutfitIndex]['name'] as String? ?? 'Unnamed Outfit',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '${_currentOutfitIndex + 1}/$outfitCount',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                       ],
                     ),
+                    const SizedBox(height: 15),
+                    // PageView for clothing items.
                     Expanded(
                       flex: 3,
                       child: PageView.builder(
@@ -183,14 +205,20 @@ class _OutfitsPageState extends State<OutfitsPage> {
                         },
                         itemCount: outfitCount,
                         itemBuilder: (context, outfitIndex) {
-                          final clothes = outfitsForSelectedDate[outfitIndex]['clothes'] as Map<String, String>;
+                          final clothes = outfitsForSelectedDate[outfitIndex]['clothes'] as Map<String, dynamic>;
+                          // Cast to Map<String, String?> to avoid type issues.
+                          final clothesMap = Map<String, String?>.from(clothes);
                           return GridView.count(
                             crossAxisCount: 2,
                             crossAxisSpacing: 8,
                             mainAxisSpacing: 8,
                             childAspectRatio: 1,
-                            children: clothes.entries.map((entry) {
-                              return _buildClothingItem(entry.key, entry.value, outfitIndex);
+                            children: clothesMap.entries.map((entry) {
+                              // Wrap each tile in a RepaintBoundary with a stable key.
+                              return RepaintBoundary(
+                                key: ValueKey('clothing_${entry.key}_$outfitIndex'),
+                                child: _buildClothingItem(entry.key, entry.value, outfitIndex),
+                              );
                             }).toList(),
                           );
                         },
@@ -200,21 +228,29 @@ class _OutfitsPageState extends State<OutfitsPage> {
                       alignment: Alignment.centerLeft,
                       child: Text("ACCESSORIES", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
+                    // Horizontal list for accessories.
                     SizedBox(
                       height: 80,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         itemCount: (outfitsForSelectedDate[_currentOutfitIndex]['accessories'] as List).length,
                         itemBuilder: (context, accessoryIndex) {
-                          final accessory = outfitsForSelectedDate[_currentOutfitIndex]['accessories'][accessoryIndex];
-                          return _buildAccessoryItem(accessory, _currentOutfitIndex, accessoryIndex);
+                          final accessory = (outfitsForSelectedDate[_currentOutfitIndex]['accessories'] as List)[accessoryIndex];
+                          return RepaintBoundary(
+                            key: ValueKey('accessory_${accessoryIndex}_$_currentOutfitIndex'),
+                            child: _buildAccessoryItem(accessory, _currentOutfitIndex, accessoryIndex),
+                          );
                         },
                       ),
                     ),
                   ],
                 )
                     : const Center(
-                  child: Text('No outfits for this day.\nTap + to add some', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  child: Text(
+                    'No outfits for this day.\nTap + to add some',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
                 ),
               ),
             ),
@@ -224,19 +260,23 @@ class _OutfitsPageState extends State<OutfitsPage> {
     );
   }
 
-  Widget _buildClothingItem(String category, String imageUrl, int outfitIndex) {
+  // Build a clothing item tile.
+  Widget _buildClothingItem(String category, String? imageUrl, int outfitIndex) {
     return GestureDetector(
       onTap: _isEditing ? () => _editItem(category, outfitIndex) : null,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6),
-          image: imageUrl.isNotEmpty ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover) : null,
+          image: (imageUrl != null && imageUrl.isNotEmpty)
+              ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
+              : null,
         ),
       ),
     );
   }
 
-  Widget _buildAccessoryItem(String imageUrl, int outfitIndex, int accessoryIndex) {
+  // Build an accessory tile.
+  Widget _buildAccessoryItem(String? imageUrl, int outfitIndex, int accessoryIndex) {
     return GestureDetector(
       onTap: _isEditing ? () => _editAccessoryItem(outfitIndex, accessoryIndex) : null,
       child: Container(
@@ -246,17 +286,78 @@ class _OutfitsPageState extends State<OutfitsPage> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(2),
           border: Border.all(color: Colors.grey),
-          image: imageUrl.isNotEmpty ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover) : null,
+          image: (imageUrl != null && imageUrl.isNotEmpty)
+              ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
+              : null,
         ),
       ),
     );
   }
 
+  // Launch ItemSelectionPage to edit a clothing item.
   void _editItem(String category, int outfitIndex) {
-    // Implement edit functionality for clothing items
+    Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ItemSelectionPage(
+          slot: category,
+          fromCreateOutfit: true,
+        ),
+      ),
+    ).then((result) {
+      if (result != null) {
+        setState(() {
+          final normalizedDate = _normalizeDate(selectedDate);
+          final outfit = outfitsPerDay[normalizedDate]![outfitIndex];
+          Map<String, String?> clothesMap = Map<String, String?>.from(outfit['clothes'] as Map);
+          clothesMap[category] = result['item'].imageUrl as String?;
+          outfit['clothes'] = clothesMap;
+        });
+      }
+    });
   }
 
+  // Launch ItemSelectionPage to edit an accessory.
   void _editAccessoryItem(int outfitIndex, int accessoryIndex) {
-    // Implement edit functionality for accessories
+    Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ItemSelectionPage(fromCreateOutfit: true),
+      ),
+    ).then((result) {
+      if (result != null) {
+        final newUrl = result['item'].imageUrl as String?;
+        setState(() {
+          final normalizedDate = _normalizeDate(selectedDate);
+          final outfit = outfitsPerDay[normalizedDate]![outfitIndex];
+          List<String?> accessories = List<String?>.from(outfit['accessories'] as List);
+          if (accessoryIndex < accessories.length) {
+            accessories[accessoryIndex] = newUrl;
+          } else {
+            accessories.add(newUrl);
+          }
+          outfit['accessories'] = accessories;
+        });
+      }
+    });
   }
+}
+
+class ColorTile {
+  Color color;
+  ColorTile({required this.color});
+}
+
+class Outfit {
+  final String name;
+  final DateTime date;
+  final Map<String, String?> clothes;
+  final List<String?> accessories;
+
+  Outfit({
+    required this.name,
+    required this.date,
+    required this.clothes,
+    required this.accessories,
+  });
 }

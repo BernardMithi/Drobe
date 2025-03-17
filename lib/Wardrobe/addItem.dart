@@ -18,7 +18,11 @@ class AddItemPage extends StatefulWidget {
 class _AddItemPageState extends State<AddItemPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _imageUrlController = TextEditingController();
+
   File? _selectedImage;
+  String? _imageUrl;
+
   late Box itemsBox;
   List<int> _selectedColors = []; // Stores selected colors (Max 3)
 
@@ -28,64 +32,185 @@ class _AddItemPageState extends State<AddItemPage> {
     itemsBox = Hive.box('itemsBox'); // Ensure Hive is initialized
   }
 
-  /// **Pick an Image & Extract Colors**
-  Future<void> _pickImage() async {
+  /// Show Bottom Sheet to Choose Image Source
+  void _showImageSourceOptions() {
+    showModalBottomSheet(
+      context: context,
+      // Rounded corners at the top
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      // Optional: you can also specify backgroundColor if desired
+      builder: (context) {
+        return SafeArea(
+          // Use a Column with a small drag handle at the top
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle for a more polished look
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // The original list of options
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.link),
+                title: const Text('Enter URL'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEnterUrlDialog();
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Pick Image from Camera or Gallery
+  Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(source: source);
     if (pickedFile != null) {
       File imageFile = File(pickedFile.path);
       setState(() {
         _selectedImage = imageFile;
+        _imageUrl = null; // Clear any previously entered URL
       });
 
-      // Extract dominant colors from the image (Limit 3)
+      // Extract colors from image
       await _extractColorsFromImage(imageFile);
     }
   }
 
-  /// **Extract 3 Main Colors from Image**
+  /// Show Dialog to Enter Image URL
+  Future<void> _showEnterUrlDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Enter Image URL"),
+          content: TextField(
+            controller: _imageUrlController,
+            decoration: const InputDecoration(hintText: "https://example.com/image.jpg"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _imageUrl = _imageUrlController.text.trim();
+                  _selectedImage = null; // Clear any previously selected file
+                });
+                Navigator.pop(context);
+              },
+              child: const Text("Confirm"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Extract 3 Main Colors from Image
   Future<void> _extractColorsFromImage(File imageFile) async {
     final paletteGenerator = await PaletteGenerator.fromImageProvider(
       FileImage(imageFile),
       size: const Size(200, 200),
-      maximumColorCount: 3, // ✅ Limit to 3 main colors
+      maximumColorCount: 3, // Limit to 3 main colors
     );
 
     setState(() {
       _selectedColors = paletteGenerator.paletteColors
-          .take(3) // ✅ Keep only the first 3 colors
+          .take(3)
           .map((color) => color.color.value)
           .toList();
     });
   }
 
-  /// **Open macOS-style Color Picker**
+  /// Open Color Picker
   Future<void> _openColorPicker() async {
-    if (_selectedColors.length >= 3) {
+    if (_selectedColors.length >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You can only select up to 3 colors.")),
+        const SnackBar(content: Text("You can only select up to 5 colors.")),
       );
       return;
     }
 
-    Color? selectedColor = await showDialog<Color>(
-      context: context,
-      builder: (context) => _MacOSColorPickerDialog(),
-    );
+    Color selectedColor = Colors.black;
 
-    if (selectedColor != null && !_selectedColors.contains(selectedColor.value)) {
-      setState(() {
-        _selectedColors.add(selectedColor.value);
-        if (_selectedColors.length > 3) {
-          _selectedColors = _selectedColors.take(3).toList();
-        }
-      });
-    }
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Pick a Color"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ColorPicker(
+                pickerColor: selectedColor,
+                enableAlpha: false,
+                showLabel: false,
+                onColorChanged: (color) {
+                  selectedColor = color;
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (!_selectedColors.contains(selectedColor.value)) {
+                  setState(() {
+                    _selectedColors.add(selectedColor.value);
+                    if (_selectedColors.length > 5) {
+                      _selectedColors = _selectedColors.take(5).toList();
+                    }
+                  });
+                }
+                Navigator.pop(context);
+              },
+              child: const Text("Select"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  /// **Save New Item to Hive**
+  /// Save New Item to Hive
   void _saveItem() {
-    if (_nameController.text.isEmpty || _selectedImage == null) {
+    if (_nameController.text.isEmpty || (_selectedImage == null && (_imageUrl == null || _imageUrl!.isEmpty))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please provide a name and image.")),
       );
@@ -94,7 +219,7 @@ class _AddItemPageState extends State<AddItemPage> {
 
     final newItem = Item(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      imageUrl: _selectedImage!.path, // Save image path
+      imageUrl: _selectedImage != null ? _selectedImage!.path : _imageUrl!,
       name: _nameController.text,
       description: _descriptionController.text,
       category: widget.category,
@@ -125,28 +250,33 @@ class _AddItemPageState extends State<AddItemPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // **Image Picker (Square)**
+            // Image Picker (Tap to Choose)
             GestureDetector(
-              onTap: _pickImage,
+              onTap: _showImageSourceOptions,
               child: Container(
-                height: 200,
-                width: 200, // **Make it a Square**
+                height: 400,
+                width: 400,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: _selectedImage == null
-                    ? const Icon(Icons.image, size: 80, color: Colors.grey)
-                    : ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                child: _selectedImage != null
+                    ? ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
                   child: Image.file(_selectedImage!, fit: BoxFit.cover),
-                ),
+                )
+                    : _imageUrl != null
+                    ? ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: Image.network(_imageUrl!, fit: BoxFit.cover),
+                )
+                    : const Icon(Icons.image, size: 100, color: Colors.grey),
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // **Name Input Field**
+            // Name Input Field
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -156,7 +286,7 @@ class _AddItemPageState extends State<AddItemPage> {
             ),
             const SizedBox(height: 16),
 
-            // **Description Input Field**
+            // Description Input Field
             TextField(
               controller: _descriptionController,
               decoration: const InputDecoration(
@@ -168,7 +298,7 @@ class _AddItemPageState extends State<AddItemPage> {
 
             const SizedBox(height: 20),
 
-            // **Color Picker Buttons**
+            // Color Picker Buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -184,7 +314,7 @@ class _AddItemPageState extends State<AddItemPage> {
               ],
             ),
 
-            // **Display Selected Colors**
+            // Display Selected Colors
             if (_selectedColors.isNotEmpty) ...[
               const SizedBox(height: 10),
               Wrap(
@@ -207,56 +337,13 @@ class _AddItemPageState extends State<AddItemPage> {
         ),
       ),
 
-      // **Floating Save Button (Grey)**
+      // Floating Save Button
       floatingActionButton: FloatingActionButton(
         onPressed: _saveItem,
-        backgroundColor: Colors.grey[600], // **Grey color**
-        child: const Icon(Icons.check, color: Colors.white), // **Check icon for save**
+        backgroundColor: Colors.grey[600],
+        child: const Icon(Icons.check, color: Colors.white),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // **Bottom right**
-    );
-  }
-}
-
-/// **MacOS-Inspired Color Picker Dialog**
-class _MacOSColorPickerDialog extends StatefulWidget {
-  @override
-  State<_MacOSColorPickerDialog> createState() => _MacOSColorPickerDialogState();
-}
-
-class _MacOSColorPickerDialogState extends State<_MacOSColorPickerDialog> {
-  Color selectedColor = Colors.black;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text("Pick a Color"),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // **Custom Color Picker**
-          ColorPicker(
-            pickerColor: selectedColor,
-            enableAlpha: false,
-            showLabel: false,
-            onColorChanged: (color) {
-              setState(() {
-                selectedColor = color;
-              });
-            },
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, null),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, selectedColor),
-          child: const Text("Select"),
-        ),
-      ],
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
