@@ -281,6 +281,17 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
           return _buildErrorImagePlaceholder();
         },
       );
+    } else if (imageUrl.startsWith('/')) {
+      // If it's already an absolute path, use it directly
+      final file = File(imageUrl);
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading file image: $error');
+          return _buildErrorImagePlaceholder();
+        },
+      );
     } else {
       // Use FutureBuilder to handle async image path resolution
       return FutureBuilder<String>(
@@ -567,23 +578,35 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         final selectedItem = items[random.nextInt(items.length)];
         final selectedImageUrl = selectedItem.imageUrl;
 
+        if (selectedImageUrl == null || selectedImageUrl.isEmpty) {
+          print('Selected item has no valid image URL');
+          continue;
+        }
+
         print('About to update state for $category with URL: $selectedImageUrl');
 
-        // Get absolute path and verify file exists
-        final absPath = await getAbsoluteImagePath(selectedImageUrl);
-        final file = File(absPath);
-        final exists = await file.exists();
+        // Get absolute path if needed
+        String finalPath;
+        if (selectedImageUrl.startsWith('http') || selectedImageUrl.startsWith('/')) {
+          finalPath = selectedImageUrl;
+        } else {
+          finalPath = await getAbsoluteImagePath(selectedImageUrl);
+        }
 
-        if (exists) {
-          setState(() {
-            // Store the FULL absolute path in state
-            chosenClothes[category] = absPath;
-          });
-          return true;
+        // Verify file exists for local paths
+        if (!selectedImageUrl.startsWith('http')) {
+          final file = File(finalPath);
+          final exists = await file.exists();
+          if (!exists) {
+            print('File does not exist at path: $finalPath');
+            continue;
+          }
         }
-        else {
-          print('File does not exist, trying another item...');
-        }
+
+        setState(() {
+          chosenClothes[category] = finalPath;
+        });
+        return true;
       } catch (e) {
         print('Error selecting item for $category (attempt ${attempt + 1}): $e');
         await Future.delayed(const Duration(milliseconds: 300));
@@ -594,38 +617,42 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
 
   // Helper method to get items for a specific category
   Future<List<Item>> _getItemsForCategory(String category) async {
-    final itemsBox = Hive.box('itemsBox');
+    try {
+      final itemsBox = await Hive.openBox('itemsBox');
 
-    // Handle singular/plural mismatches
-    String categoryToMatch = category.toLowerCase();
+      // Handle singular/plural mismatches
+      String categoryToMatch = category.toLowerCase();
 
-    // Convert from UI category to database category if needed
-    String dbCategory;
-    if (categoryToMatch == "layer") dbCategory = "layers";
-    else if (categoryToMatch == "shirt") dbCategory = "shirts";
-    else if (categoryToMatch == "bottoms") dbCategory = "bottoms";
-    else if (categoryToMatch == "shoes") dbCategory = "shoes";
-    else dbCategory = categoryToMatch;
+      // Convert from UI category to database category if needed
+      String dbCategory;
+      if (categoryToMatch == "layer") dbCategory = "layers";
+      else if (categoryToMatch == "shirt") dbCategory = "shirts";
+      else if (categoryToMatch == "bottoms") dbCategory = "bottoms";
+      else if (categoryToMatch == "shoes") dbCategory = "shoes";
+      else if (categoryToMatch == "accessories") dbCategory = "accessories";
+      else dbCategory = categoryToMatch;
 
-    final filteredItems = itemsBox.values
-        .cast<Item>()
-        .where((item) {
-      String itemCategory = item.category.toLowerCase();
-      return itemCategory == dbCategory;
-    })
-        .toList();
+      final filteredItems = itemsBox.values
+          .whereType<Item>() // Use whereType instead of cast
+          .where((item) {
+        String itemCategory = item.category.toLowerCase();
+        return itemCategory == dbCategory;
+      })
+          .toList();
 
-    return filteredItems;
+      return filteredItems;
+    } catch (e) {
+      print('Error getting items for category $category: $e');
+      return [];
+    }
   }
 
   // Helper method to select a random accessory
-  // Modified method to select a random accessory without UI flash
-  // Make sure to check for null before accessing or casting values
   Future<void> _selectRandomAccessory() async {
     try {
       // Create a set of already selected accessory URLs to check for duplicates
       final selectedAccessoryUrls = chosenAccessories
-          .where((url) => url != null)
+          .whereType<String>()
           .toSet();
 
       // Get accessories directly without navigating to selection page
@@ -646,10 +673,20 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         final newAccessoryUrl = selectedItem.imageUrl;
 
         // Check if this accessory is already selected
-        if (newAccessoryUrl != null && !selectedAccessoryUrls.contains(newAccessoryUrl)) {
+        if (newAccessoryUrl != null && newAccessoryUrl.isNotEmpty &&
+            !selectedAccessoryUrls.contains(newAccessoryUrl)) {
           foundNewAccessory = true;
+
+          // Get absolute path if needed
+          String finalPath;
+          if (newAccessoryUrl.startsWith('http') || newAccessoryUrl.startsWith('/')) {
+            finalPath = newAccessoryUrl;
+          } else {
+            finalPath = await getAbsoluteImagePath(newAccessoryUrl);
+          }
+
           setState(() {
-            chosenAccessories.add(newAccessoryUrl);
+            chosenAccessories.add(finalPath);
           });
         }
       }
@@ -671,10 +708,12 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
     );
 
     if (result != null && result is Map && result.containsKey('item')) {
-      setState(() {
-        // Assuming the result contains an item object with imageUrl
-        chosenClothes[category] = result['item'].imageUrl;
-      });
+      final item = result['item'];
+      if (item != null && item.imageUrl != null) {
+        setState(() {
+          chosenClothes[category] = item.imageUrl;
+        });
+      }
     }
   }
 
@@ -691,15 +730,18 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
     );
 
     if (result != null && result is Map && result.containsKey('item')) {
-      setState(() {
-        if (replaceIndex != null && replaceIndex < chosenAccessories.length) {
-          // Replace existing accessory
-          chosenAccessories[replaceIndex] = result['item'].imageUrl;
-        } else {
-          // Add new accessory
-          chosenAccessories.add(result['item'].imageUrl);
-        }
-      });
+      final item = result['item'];
+      if (item != null && item.imageUrl != null) {
+        setState(() {
+          if (replaceIndex != null && replaceIndex < chosenAccessories.length) {
+            // Replace existing accessory
+            chosenAccessories[replaceIndex] = item.imageUrl;
+          } else {
+            // Add new accessory
+            chosenAccessories.add(item.imageUrl);
+          }
+        });
+      }
     }
   }
 
@@ -713,9 +755,9 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
       // Process and verify all clothing image paths in the outfit
       Map<String, String> verifiedClothes = {};
       for (final entry in chosenClothes.entries) {
-        if (entry.value != null) {  // Add null check
+        if (entry.value != null && entry.value!.isNotEmpty) {
           final imagePath = await _ensureProperImagePath(entry.value);
-          if (imagePath != null) {  // Add null check
+          if (imagePath != null) {
             verifiedClothes[entry.key] = imagePath;
             imagePaths.add(imagePath);
           }
@@ -725,9 +767,9 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
       // Process and verify all accessories image paths
       List<String> verifiedAccessories = [];
       for (final accessoryPath in chosenAccessories) {
-        if (accessoryPath != null) {  // Add null check
+        if (accessoryPath != null && accessoryPath.isNotEmpty) {
           final verifiedPath = await _ensureProperImagePath(accessoryPath);
-          if (verifiedPath != null) {  // Add null check
+          if (verifiedPath != null) {
             verifiedAccessories.add(verifiedPath);
             imagePaths.add(verifiedPath);
           }
@@ -737,8 +779,12 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
       // Log all image paths for debugging
       print('Saving outfit with the following images:');
       for (final path in imagePaths) {
-        bool exists = await File(path).exists();
-        print('  - $path (exists: $exists)');
+        if (!path.startsWith('http')) {
+          bool exists = await File(path).exists();
+          print('  - $path (exists: $exists)');
+        } else {
+          print('  - $path (network image)');
+        }
       }
 
       // Create a new outfit object with verified paths
@@ -755,18 +801,22 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
       await OutfitStorageService.saveOutfit(newOutfit);
 
       // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Outfit saved successfully!')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Outfit saved successfully!')),
+        );
 
-      // Return to previous screen
-      Navigator.pop(context, newOutfit);
+        // Return to previous screen
+        Navigator.pop(context, newOutfit);
+      }
     } catch (e) {
       // Show error message
       print('Error saving outfit: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save outfit: ${e.toString()}')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save outfit: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -779,19 +829,32 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         return imagePath;
       }
 
-      // Try to use the path directly first
-      if (await File(imagePath).exists()) {
-        return imagePath;
+      // If it's already an absolute path, verify it exists
+      if (imagePath.startsWith('/')) {
+        final file = File(imagePath);
+        if (await file.exists()) {
+          return imagePath;
+        }
       }
 
-      // Get the app's documents directory
+      // Try to get absolute path from relative path
+      try {
+        final absolutePath = await getAbsoluteImagePath(imagePath);
+        final file = File(absolutePath);
+        if (await file.exists()) {
+          return absolutePath;
+        }
+      } catch (e) {
+        print('Error resolving absolute path: $e');
+      }
+
+      // Get the app's documents directory and try different locations
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = path.basename(imagePath);
 
-      // Try to find the file in different locations
+      // Try in the wardrobe_images directory
       final wardrobeImagesPath = path.join(appDir.path, 'wardrobe_images');
       final wardrobePath = path.join(wardrobeImagesPath, fileName);
-
       if (await File(wardrobePath).exists()) {
         return wardrobePath;
       }
@@ -802,6 +865,12 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         return possiblePath;
       }
 
+      // Try with the original path as a fallback
+      if (await File(imagePath).exists()) {
+        return imagePath;
+      }
+
+      print('Warning: Could not find valid path for image: $imagePath');
       return imagePath; // Return original path as fallback
     } catch (e) {
       print('Error resolving path: $e');

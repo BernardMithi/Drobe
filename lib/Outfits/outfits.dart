@@ -9,6 +9,8 @@ import 'createPalette.dart';
 import 'package:drobe/models/outfit.dart';
 import 'package:path/path.dart' as path;
 import 'package:drobe/services/outfitStorage.dart';
+import 'package:uuid/uuid.dart';
+import 'dart:async';
 
 class OutfitsPage extends StatefulWidget {
   const OutfitsPage({Key? key}) : super(key: key);
@@ -23,9 +25,10 @@ class _OutfitsPageState extends State<OutfitsPage> {
   int _currentOutfitIndex = 0;
   bool _isEditing = false;
   bool _isLoading = true;
+  Timer? _debounceTimer;
 
 
-  // ✅ Stores only Outfit objects
+  // Stores only Outfit objects
   final Map<DateTime, List<Outfit>> outfitsPerDay = {};
 
   @override
@@ -37,6 +40,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
   @override
   void dispose() {
     _outfitController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -177,7 +181,8 @@ class _OutfitsPageState extends State<OutfitsPage> {
                                 Navigator.pop(context);
                               },
                               child: const Text('Delete'),
-                            ),                          ],
+                            ),
+                          ],
                         ),
                       );
                     }
@@ -306,7 +311,8 @@ class _OutfitsPageState extends State<OutfitsPage> {
                         _isEditing
                             ? SizedBox(
                           width: 300,
-                          child: TextFormField(
+                          child: // Replace the TextFormField in the _buildClothingItem method with this improved version:
+                          TextFormField(
                             initialValue: outfitsForSelectedDate[_currentOutfitIndex].name ?? '',
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             textAlignVertical: TextAlignVertical.center,
@@ -319,8 +325,25 @@ class _OutfitsPageState extends State<OutfitsPage> {
                               setState(() {
                                 outfitsForSelectedDate[_currentOutfitIndex].name = newValue;
                               });
+                              // Auto-save after a brief delay to avoid saving on every keystroke
+                              _debouncedSave(_currentOutfitIndex);
                             },
-                          ),
+                            onEditingComplete: () {
+                              // Still save when Enter is pressed
+                              _updateOutfit(_currentOutfitIndex);
+                              // Remove focus from the text field
+                              FocusScope.of(context).unfocus();
+                            },
+                            // Add onTap to ensure the text field behaves predictably
+                            onTap: () {
+                              // Optional: You could select all text when tapping
+                              // controller.selection = TextSelection(baseOffset: 0, extentOffset: controller.text.length);
+                            },
+                            // Add this to save when the field loses focus
+                            onFieldSubmitted: (_) {
+                              _updateOutfit(_currentOutfitIndex);
+                            },
+                          )
                         )
                             : Text(
                           outfitsForSelectedDate[_currentOutfitIndex].name,
@@ -361,7 +384,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
 
                               if (outfit.accessories.isNotEmpty || _isEditing)
                                 SizedBox(
-                                  height: 140,// ✅ Set a fixed height to prevent movement
+                                  height: 140, // Set a fixed height to prevent movement
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -465,7 +488,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
             },
           ),
 
-          // 🛠️ Split Overlay for Edit/Delete Actions
+          // Split Overlay for Edit/Delete Actions
           if (_isEditing)
             Positioned.fill(
               child: Row(
@@ -516,7 +539,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
 
   Widget _buildAccessoryItem(String? accessoryUrl, int outfitIndex, int accessoryIndex) {
     return FutureBuilder<String?>(
-      future: _resolveFilePath(accessoryUrl ?? ''),
+      future: accessoryUrl != null ? _resolveFilePath(accessoryUrl) : Future.value(null),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
@@ -607,27 +630,6 @@ class _OutfitsPageState extends State<OutfitsPage> {
     );
   }
 
-  Widget _buildEmptyAccessoryItem(int outfitIndex, int accessoryIndex) {
-    return GestureDetector(
-      onTap: _isEditing ? () => _editAccessory(outfitIndex, accessoryIndex) : null,
-      child: Container(
-        width: 80,
-        height: 80,
-        margin: const EdgeInsets.only(right: 8.0),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.broken_image, color: Colors.grey),
-              SizedBox(height: 4),
-              Text('No image', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildBrokenImagePlaceholder(String category) {
     return Center(
       child: Column(
@@ -677,12 +679,9 @@ class _OutfitsPageState extends State<OutfitsPage> {
         final item = result['item'];
         String? newImageUrl = item.imageUrl;
 
-        print('Selected accessory: ${item.name}, imageUrl: $newImageUrl'); // Debug log
-
         if (newImageUrl != null && newImageUrl.isNotEmpty) {
           // Replace the accessory at the given index
           outfitsPerDay[normalizedDate]![outfitIndex].accessories[accessoryIndex] = newImageUrl;
-          print('Updated accessories: ${outfitsPerDay[normalizedDate]![outfitIndex].accessories}');
         }
       });
 
@@ -706,8 +705,6 @@ class _OutfitsPageState extends State<OutfitsPage> {
 
         if (newImageUrl != null && newImageUrl.isNotEmpty) {
           outfitsPerDay[normalizedDate]![outfitIndex].accessories.add(newImageUrl);
-          print('Added new accessory: $newImageUrl');
-          print('Updated accessories list: ${outfitsPerDay[normalizedDate]![outfitIndex].accessories}');
         }
       });
 
@@ -745,7 +742,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
     );
   }
 
-  // Add new methods to handle item deletion
+  // Method to handle item deletion
   void _deleteItem(String category, int outfitIndex) {
     showDialog(
       context: context,
@@ -775,15 +772,18 @@ class _OutfitsPageState extends State<OutfitsPage> {
     );
   }
 
-
-
-  // Moved _loadOutfits inside the class
   Future<void> _loadOutfits() async {
     try {
       final allOutfits = await OutfitStorageService.getAllOutfits();
 
       // Group outfits by date
       for (var outfit in allOutfits) {
+        // Ensure the outfit has an ID
+        if (outfit.id == null || outfit.id!.isEmpty) {
+          outfit.id = const Uuid().v4();
+          await OutfitStorageService.updateOutfit(outfit);
+        }
+
         final normalizedDate = _normalizeDate(outfit.date);
 
         if (!outfitsPerDay.containsKey(normalizedDate)) {
@@ -812,7 +812,6 @@ class _OutfitsPageState extends State<OutfitsPage> {
     if (outfit.id != null && outfit.id!.isNotEmpty) {
       try {
         await OutfitStorageService.updateOutfit(outfit);
-        print('Outfit updated in storage: ${outfit.id}');
       } catch (e) {
         print('Error updating outfit: $e');
       }
@@ -820,14 +819,25 @@ class _OutfitsPageState extends State<OutfitsPage> {
       // If outfit has no ID yet, save it as a new outfit
       try {
         await OutfitStorageService.saveOutfit(outfit);
-        print('New outfit saved to storage');
       } catch (e) {
         print('Error saving new outfit: $e');
       }
     }
   }
 
-  // Moved _saveOutfit inside the class
+  void _debouncedSave(int outfitIndex) {
+    // Cancel previous timer if it exists
+    if (_debounceTimer?.isActive ?? false) {
+      _debounceTimer!.cancel();
+    }
+
+    // Start a new timer
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _updateOutfit(outfitIndex);
+    });
+  }
+
+
   Future<void> _saveOutfit(Outfit outfit) async {
     try {
       await OutfitStorageService.saveOutfit(outfit);
