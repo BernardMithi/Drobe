@@ -10,10 +10,7 @@ class WardrobePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'YOUR WARDROBE',
-          style: TextStyle(
-            fontFamily: 'Avenir',
-            fontWeight: FontWeight.bold,
-          ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
         ),
         centerTitle: true,
         leading: IconButton(

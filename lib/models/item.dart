@@ -61,4 +61,27 @@ class Item extends HiveObject {
     inLaundry = false;
     save();
   }
+
+  // ✅ Add this `copyWith` method
+  Item copyWith({
+    String? id,
+    String? imageUrl,
+    String? name,
+    String? description,
+    List<int>? colors,
+    String? category,
+    int? wearCount,
+    bool? inLaundry,
+  }) {
+    return Item(
+      id: id ?? this.id,
+      imageUrl: imageUrl ?? this.imageUrl,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      colors: colors ?? this.colors,
+      category: category ?? this.category,
+      wearCount: wearCount ?? this.wearCount,
+      inLaundry: inLaundry ?? this.inLaundry,
+    );
+  }
 }

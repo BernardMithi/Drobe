@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'createOutfit.dart';
+import 'package:drobe/models/item.dart';
 import 'itemSelection.dart';
 import 'createPalette.dart';
-import 'package:drobe/models/item.dart'; // ensure Item is imported
+import 'package:drobe/models/outfit.dart';
+import 'package:path/path.dart' as path;
+import 'package:drobe/services/outfitStorage.dart';
 
 class OutfitsPage extends StatefulWidget {
   const OutfitsPage({Key? key}) : super(key: key);
@@ -17,11 +22,17 @@ class _OutfitsPageState extends State<OutfitsPage> {
   final PageController _outfitController = PageController();
   int _currentOutfitIndex = 0;
   bool _isEditing = false;
+  bool _isLoading = true;
 
-  // Outfits stored by normalized date.
-  // Each outfit is stored as a Map containing:
-  //   'name': String, 'clothes': Map<String, String?>, 'accessories': List<String?>
-  final Map<DateTime, List<Map<String, dynamic>>> outfitsPerDay = {};
+
+  // ✅ Stores only Outfit objects
+  final Map<DateTime, List<Outfit>> outfitsPerDay = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOutfits();
+  }
 
   @override
   void dispose() {
@@ -29,14 +40,58 @@ class _OutfitsPageState extends State<OutfitsPage> {
     super.dispose();
   }
 
-  // Normalize date (remove time)
   DateTime _normalizeDate(DateTime date) {
     return DateTime(date.year, date.month, date.day);
   }
 
-  // Format date for display
   String _getFormattedDate(DateTime date) {
     return DateFormat('EEEE, d MMMM y').format(date);
+  }
+
+  // This method resolves the correct file path
+  Future<String?> _resolveFilePath(String imagePath) async {
+    try {
+      // If it's a network image, return as is
+      if (imagePath.startsWith('http')) {
+        return imagePath;
+      }
+
+      // Try to use the path directly first
+      if (await File(imagePath).exists()) {
+        return imagePath;
+      }
+
+      // Get the app's documents directory
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = path.basename(imagePath);
+
+      // Try to find the file in the wardrobe_images directory
+      final wardrobeDir = Directory('${appDir.path}/wardrobe_images');
+      final wardrobePath = path.join(wardrobeDir.path, fileName);
+
+      if (await File(wardrobePath).exists()) {
+        return wardrobePath;
+      }
+
+      // Try in the main documents directory
+      final possiblePath = path.join(appDir.path, fileName);
+      if (await File(possiblePath).exists()) {
+        return possiblePath;
+      }
+
+      // Try in temporary directory
+      final tempDir = await getTemporaryDirectory();
+      final tempPath = path.join(tempDir.path, fileName);
+      if (await File(tempPath).exists()) {
+        return tempPath;
+      }
+
+      print('Could not resolve path for: $imagePath');
+      return null;
+    } catch (e) {
+      print('Error resolving path: $e');
+      return null;
+    }
   }
 
   @override
@@ -47,11 +102,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        // Show outfit name if available; otherwise, static title.
-        title: Text(
-               'OUTFITS',
-          style: const TextStyle(fontFamily: 'Avenir', fontSize: 16, fontWeight: FontWeight.bold),
-        ),
+        title: const Text('OUTFITS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -68,50 +119,121 @@ class _OutfitsPageState extends State<OutfitsPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Toggle edit mode.
               FloatingActionButton(
                 heroTag: 'editBtn',
-                backgroundColor: Colors.grey,
+                backgroundColor: Colors.grey[300],
+                shape: const CircleBorder(),
                 onPressed: () {
                   setState(() {
                     _isEditing = !_isEditing;
                   });
                 },
-                child: Icon(
-                  _isEditing ? Icons.cancel : Icons.edit,
-                  color: Colors.black,
-                ),
+                child: Icon(_isEditing ? Icons.check : Icons.edit, color: Colors.black),
               ),
-              // Add new outfit.
               FloatingActionButton(
                 heroTag: 'addBtn',
-                backgroundColor: Colors.grey,
+                backgroundColor: Colors.grey[300],
+                shape: const CircleBorder(),
                 onPressed: () async {
-                  final newOutfit = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CreatePalettePage(selectedDate: selectedDate),
-                    ),
-                  );
+                  if (_isEditing) {
+                    // Delete functionality when in edit mode
+                    final normalizedDate = _normalizeDate(selectedDate);
+                    final outfitsForSelectedDate = outfitsPerDay[normalizedDate] ?? [];
 
-                  if (newOutfit != null) {
-                    setState(() {
-                      DateTime outfitDate = _normalizeDate(selectedDate); // Ensure outfit is assigned to the correct date
+                    if (outfitsForSelectedDate.isNotEmpty) {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Outfit'),
+                          content: const Text('Are you sure you want to delete this outfit?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                final normalizedDate = _normalizeDate(selectedDate);
+                                final outfitToDelete = outfitsPerDay[normalizedDate]![_currentOutfitIndex];
 
-                      if (!outfitsPerDay.containsKey(outfitDate)) {
-                        outfitsPerDay[outfitDate] = [];
-                      }
+                                if (outfitToDelete.id != null) {
+                                  await OutfitStorageService.deleteOutfit(outfitToDelete.id!);
+                                }
 
-                      outfitsPerDay[outfitDate]!.add({
-                        'name': newOutfit.name,
-                        'clothes': newOutfit.clothes,
-                        'accessories': newOutfit.accessories,
+                                setState(() {
+                                  outfitsPerDay[normalizedDate]!.removeAt(_currentOutfitIndex);
+
+                                  // If removed last outfit for this day, remove the date entry
+                                  if (outfitsPerDay[normalizedDate]!.isEmpty) {
+                                    outfitsPerDay.remove(normalizedDate);
+                                  }
+                                  // Adjust current index if needed
+                                  else if (_currentOutfitIndex > 0 &&
+                                      _currentOutfitIndex >= outfitsPerDay[normalizedDate]!.length) {
+                                    _currentOutfitIndex--;
+                                    _outfitController.jumpToPage(_currentOutfitIndex);
+                                  }
+                                });
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Delete'),
+                            ),                          ],
+                        ),
+                      );
+                    }
+                  } else {
+                    // Add functionality when not in edit mode
+                    final newPalette = await Navigator.push<Map<String, dynamic>>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreatePalettePage(
+                          selectedDate: selectedDate,
+                        ),
+                      ),
+                    );
+
+                    if (newPalette != null) {
+                      setState(() {
+                        DateTime outfitDate = _normalizeDate(selectedDate);
+                        if (!outfitsPerDay.containsKey(outfitDate)) {
+                          outfitsPerDay[outfitDate] = [];
+                        }
+
+                        // Convert Color objects to hex strings for storing
+                        List<String> colorPaletteStrings = [];
+                        List<Color> colorPalette = [];
+
+                        if (newPalette['colorPalette'] != null) {
+                          colorPalette = List<Color>.from(newPalette['colorPalette'] as List<dynamic>);
+                          colorPaletteStrings = colorPalette
+                              .map((color) => '#${color.value.toRadixString(16).substring(2)}')
+                              .toList();
+                        }
+                        if (colorPalette.isEmpty) {
+                          colorPalette = [Colors.grey]; // Default gray
+                          colorPaletteStrings = ['#9E9E9E'];
+                        }
+
+                        outfitsPerDay[outfitDate]!.add(
+                          Outfit(
+                            name: newPalette['name'] as String,
+                            date: DateTime.parse(newPalette['date'] as String),
+                            clothes: Map<String, String?>.from(newPalette['clothes']),
+                            accessories: (newPalette['accessories'] as List<dynamic>?)
+                                ?.where((item) => item != null)
+                                ?.cast<String>()
+                                ?.toList() ?? [], // Filter out nulls
+                            colorPalette: colorPalette, // Pass List<Color> here
+                            colorPaletteStrings: colorPaletteStrings, // Pass the string representation
+                          ),
+                        );
                       });
-                    });
+                    }
                   }
                 },
-                child: const Icon(Icons.add, color: Colors.black),
-              ),            ],
+                child: Icon(_isEditing ? Icons.delete : Icons.add, color: Colors.black),
+              ),
+            ],
           ),
         ),
       ),
@@ -119,7 +241,6 @@ class _OutfitsPageState extends State<OutfitsPage> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 132),
         child: Column(
           children: [
-            // Date selector row.
             Center(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -178,22 +299,40 @@ class _OutfitsPageState extends State<OutfitsPage> {
                 child: outfitCount > 0
                     ? Column(
                   children: [
-                    // Header displaying the outfit's name and index.
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          outfitsForSelectedDate[_currentOutfitIndex]['name'] as String? ?? 'Unnamed Outfit',
+                        _isEditing
+                            ? SizedBox(
+                          width: 300,
+                          child: TextFormField(
+                            initialValue: outfitsForSelectedDate[_currentOutfitIndex].name ?? '',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            textAlignVertical: TextAlignVertical.center,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 6),
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (newValue) {
+                              setState(() {
+                                outfitsForSelectedDate[_currentOutfitIndex].name = newValue;
+                              });
+                            },
+                          ),
+                        )
+                            : Text(
+                          outfitsForSelectedDate[_currentOutfitIndex].name,
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          '${_currentOutfitIndex + 1}/$outfitCount',
+                          '${_currentOutfitIndex + 1}/${outfitsForSelectedDate.length}',
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                     const SizedBox(height: 15),
-                    // PageView for clothing items.
                     Expanded(
                       flex: 3,
                       child: PageView.builder(
@@ -205,40 +344,67 @@ class _OutfitsPageState extends State<OutfitsPage> {
                         },
                         itemCount: outfitCount,
                         itemBuilder: (context, outfitIndex) {
-                          final clothes = outfitsForSelectedDate[outfitIndex]['clothes'] as Map<String, dynamic>;
-                          // Cast to Map<String, String?> to avoid type issues.
-                          final clothesMap = Map<String, String?>.from(clothes);
-                          return GridView.count(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                            childAspectRatio: 1,
-                            children: clothesMap.entries.map((entry) {
-                              // Wrap each tile in a RepaintBoundary with a stable key.
-                              return RepaintBoundary(
-                                key: ValueKey('clothing_${entry.key}_$outfitIndex'),
-                                child: _buildClothingItem(entry.key, entry.value, outfitIndex),
-                              );
-                            }).toList(),
-                          );
-                        },
-                      ),
-                    ),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text("ACCESSORIES", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                    ),
-                    // Horizontal list for accessories.
-                    SizedBox(
-                      height: 80,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: (outfitsForSelectedDate[_currentOutfitIndex]['accessories'] as List).length,
-                        itemBuilder: (context, accessoryIndex) {
-                          final accessory = (outfitsForSelectedDate[_currentOutfitIndex]['accessories'] as List)[accessoryIndex];
-                          return RepaintBoundary(
-                            key: ValueKey('accessory_${accessoryIndex}_$_currentOutfitIndex'),
-                            child: _buildAccessoryItem(accessory, _currentOutfitIndex, accessoryIndex),
+                          final Outfit outfit = outfitsForSelectedDate[outfitIndex];
+                          return Column(
+                            children: [
+                              Expanded(
+                                child: GridView.count(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                  childAspectRatio: 1,
+                                  children: outfit.clothes.entries.map((entry) {
+                                    return _buildClothingItem(entry.key, entry.value, outfitIndex);
+                                  }).toList(),
+                                ),
+                              ),
+
+                              if (outfit.accessories.isNotEmpty || _isEditing)
+                                SizedBox(
+                                  height: 140,// ✅ Set a fixed height to prevent movement
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Padding(
+                                            padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
+                                            child: Text(
+                                              "Accessories",
+                                              style: TextStyle(fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                          if (_isEditing)
+                                            IconButton(
+                                              icon: const Icon(Icons.add_circle, color: Colors.grey),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () => _addNewAccessory(outfitIndex),
+                                            ),
+                                        ],
+                                      ),
+                                      Expanded(
+                                        child: outfit.accessories.isEmpty && !_isEditing
+                                            ? const Center(
+                                          child: Text(
+                                            'No accessories',
+                                            style: TextStyle(color: Colors.grey),
+                                          ),
+                                        )
+                                            : ListView.builder(
+                                          scrollDirection: Axis.horizontal,
+                                          itemCount: outfit.accessories.length,
+                                          itemBuilder: (context, index) {
+                                            final accessoryUrl = outfit.accessories[index];
+                                            return _buildAccessoryItem(accessoryUrl, outfitIndex, index);
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           );
                         },
                       ),
@@ -260,104 +426,423 @@ class _OutfitsPageState extends State<OutfitsPage> {
     );
   }
 
-  // Build a clothing item tile.
   Widget _buildClothingItem(String category, String? imageUrl, int outfitIndex) {
     return GestureDetector(
-      onTap: _isEditing ? () => _editItem(category, outfitIndex) : null,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          image: (imageUrl != null && imageUrl.isNotEmpty)
-              ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
-              : null,
-        ),
+      onTap: () => _isEditing ? _editItem(category, outfitIndex) : null,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          FutureBuilder<String?>(
+            future: imageUrl != null ? _resolveFilePath(imageUrl) : Future.value(null),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              final resolvedPath = snapshot.data;
+
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  image: resolvedPath != null
+                      ? DecorationImage(
+                      image: resolvedPath.startsWith('http')
+                          ? NetworkImage(resolvedPath)
+                          : FileImage(File(resolvedPath)) as ImageProvider,
+                      fit: BoxFit.cover)
+                      : null,
+                ),
+                child: resolvedPath == null
+                    ? _buildBrokenImagePlaceholder(category)
+                    : null,
+              );
+            },
+          ),
+
+          // 🛠️ Split Overlay for Edit/Delete Actions
+          if (_isEditing)
+            Positioned.fill(
+              child: Row(
+                children: [
+                  // Left Side (DELETE)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _deleteItem(category, outfitIndex),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.5),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            bottomLeft: Radius.circular(4),
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.delete, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Right Side (EDIT)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _editItem(category, outfitIndex),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(4),
+                            bottomRight: Radius.circular(4),
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.edit, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  // Build an accessory tile.
-  Widget _buildAccessoryItem(String? imageUrl, int outfitIndex, int accessoryIndex) {
+  Widget _buildAccessoryItem(String? accessoryUrl, int outfitIndex, int accessoryIndex) {
+    return FutureBuilder<String?>(
+      future: _resolveFilePath(accessoryUrl ?? ''),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            width: 80,
+            height: 80,
+            margin: const EdgeInsets.only(right: 8.0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              color: Colors.grey[200],
+            ),
+            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        final resolvedPath = snapshot.data;
+
+        return Container(
+          width: 80, // Ensure consistent width
+          height: 80,
+          margin: const EdgeInsets.only(right: 8.0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Stack(
+            fit: StackFit.expand, // Make sure Stack takes full size
+            children: [
+              // IMAGE
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: resolvedPath != null
+                    ? Image(
+                  image: resolvedPath.startsWith('http')
+                      ? NetworkImage(resolvedPath)
+                      : FileImage(File(resolvedPath)) as ImageProvider,
+                  fit: BoxFit.cover, // Ensure it covers full space
+                )
+                    : _buildBrokenImagePlaceholder("Accessory"),
+              ),
+
+              // OVERLAY FOR EDIT & DELETE
+              if (_isEditing)
+                Positioned.fill(
+                  child: Row(
+                    children: [
+                      // Left Side (DELETE)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _deleteAccessory(outfitIndex, accessoryIndex),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.5),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(4),
+                                bottomLeft: Radius.circular(4),
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.delete, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Right Side (EDIT)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _editAccessory(outfitIndex, accessoryIndex),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              borderRadius: const BorderRadius.only(
+                                topRight: Radius.circular(4),
+                                bottomRight: Radius.circular(4),
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.edit, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyAccessoryItem(int outfitIndex, int accessoryIndex) {
     return GestureDetector(
-      onTap: _isEditing ? () => _editAccessoryItem(outfitIndex, accessoryIndex) : null,
+      onTap: _isEditing ? () => _editAccessory(outfitIndex, accessoryIndex) : null,
       child: Container(
         width: 80,
         height: 80,
-        margin: const EdgeInsets.only(right: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(2),
-          border: Border.all(color: Colors.grey),
-          image: (imageUrl != null && imageUrl.isNotEmpty)
-              ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
-              : null,
+        margin: const EdgeInsets.only(right: 8.0),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.broken_image, color: Colors.grey),
+              SizedBox(height: 4),
+              Text('No image', style: TextStyle(fontSize: 10, color: Colors.grey)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // Launch ItemSelectionPage to edit a clothing item.
-  void _editItem(String category, int outfitIndex) {
-    Navigator.push<Map<String, dynamic>>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ItemSelectionPage(
-          slot: category,
-          fromCreateOutfit: true,
-        ),
+  Widget _buildBrokenImagePlaceholder(String category) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 4),
+          Text(
+            "NO $category",
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
-    ).then((result) {
-      if (result != null) {
-        setState(() {
-          final normalizedDate = _normalizeDate(selectedDate);
-          final outfit = outfitsPerDay[normalizedDate]![outfitIndex];
-          Map<String, String?> clothesMap = Map<String, String?>.from(outfit['clothes'] as Map);
-          clothesMap[category] = result['item'].imageUrl as String?;
-          outfit['clothes'] = clothesMap;
-        });
-      }
-    });
+    );
   }
 
-  // Launch ItemSelectionPage to edit an accessory.
-  void _editAccessoryItem(int outfitIndex, int accessoryIndex) {
-    Navigator.push<Map<String, dynamic>>(
+  void _editItem(String category, int outfitIndex) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
-        builder: (_) => ItemSelectionPage(fromCreateOutfit: true),
+        builder: (_) => ItemSelectionPage(slot: category, fromCreateOutfit: true),
       ),
-    ).then((result) {
-      if (result != null) {
-        final newUrl = result['item'].imageUrl as String?;
-        setState(() {
-          final normalizedDate = _normalizeDate(selectedDate);
-          final outfit = outfitsPerDay[normalizedDate]![outfitIndex];
-          List<String?> accessories = List<String?>.from(outfit['accessories'] as List);
-          if (accessoryIndex < accessories.length) {
-            accessories[accessoryIndex] = newUrl;
-          } else {
-            accessories.add(newUrl);
-          }
-          outfit['accessories'] = accessories;
-        });
-      }
-    });
+    );
+
+    if (result != null) {
+      setState(() {
+        final normalizedDate = _normalizeDate(selectedDate);
+        outfitsPerDay[normalizedDate]![outfitIndex].clothes[category] = result['item'].imageUrl as String?;
+      });
+
+      // Save the updated outfit to Hive
+      await _updateOutfit(outfitIndex);
+    }
   }
-}
 
-class ColorTile {
-  Color color;
-  ColorTile({required this.color});
-}
+  void _editAccessory(int outfitIndex, int accessoryIndex) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ItemSelectionPage(slot: 'Accessories', fromCreateOutfit: true),
+      ),
+    );
 
-class Outfit {
-  final String name;
-  final DateTime date;
-  final Map<String, String?> clothes;
-  final List<String?> accessories;
+    if (result != null) {
+      setState(() {
+        final normalizedDate = _normalizeDate(selectedDate);
+        final item = result['item'];
+        String? newImageUrl = item.imageUrl;
 
-  Outfit({
-    required this.name,
-    required this.date,
-    required this.clothes,
-    required this.accessories,
-  });
+        print('Selected accessory: ${item.name}, imageUrl: $newImageUrl'); // Debug log
+
+        if (newImageUrl != null && newImageUrl.isNotEmpty) {
+          // Replace the accessory at the given index
+          outfitsPerDay[normalizedDate]![outfitIndex].accessories[accessoryIndex] = newImageUrl;
+          print('Updated accessories: ${outfitsPerDay[normalizedDate]![outfitIndex].accessories}');
+        }
+      });
+
+      // Save the updated outfit to Hive
+      await _updateOutfit(outfitIndex);
+    }
+  }
+
+  void _addNewAccessory(int outfitIndex) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ItemSelectionPage(slot: 'Accessories', fromCreateOutfit: true),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        final normalizedDate = _normalizeDate(selectedDate);
+        String? newImageUrl = result['item'].imageUrl;
+
+        if (newImageUrl != null && newImageUrl.isNotEmpty) {
+          outfitsPerDay[normalizedDate]![outfitIndex].accessories.add(newImageUrl);
+          print('Added new accessory: $newImageUrl');
+          print('Updated accessories list: ${outfitsPerDay[normalizedDate]![outfitIndex].accessories}');
+        }
+      });
+
+      // Save the updated outfit to Hive
+      await _updateOutfit(outfitIndex);
+    }
+  }
+
+  void _deleteAccessory(int outfitIndex, int accessoryIndex) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Accessory'),
+        content: const Text('Are you sure you want to remove this accessory?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              setState(() {
+                final normalizedDate = _normalizeDate(selectedDate);
+                outfitsPerDay[normalizedDate]![outfitIndex].accessories.removeAt(accessoryIndex);
+              });
+
+              // Save the updated outfit to Hive
+              await _updateOutfit(outfitIndex);
+              Navigator.pop(context);
+            },
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add new methods to handle item deletion
+  void _deleteItem(String category, int outfitIndex) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Item'),
+        content: Text('Are you sure you want to remove this $category?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              setState(() {
+                final normalizedDate = _normalizeDate(selectedDate);
+                outfitsPerDay[normalizedDate]![outfitIndex].clothes[category] = null;
+              });
+
+              // Save the updated outfit to Hive
+              await _updateOutfit(outfitIndex);
+              Navigator.pop(context);
+            },
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+  // Moved _loadOutfits inside the class
+  Future<void> _loadOutfits() async {
+    try {
+      final allOutfits = await OutfitStorageService.getAllOutfits();
+
+      // Group outfits by date
+      for (var outfit in allOutfits) {
+        final normalizedDate = _normalizeDate(outfit.date);
+
+        if (!outfitsPerDay.containsKey(normalizedDate)) {
+          outfitsPerDay[normalizedDate] = [];
+        }
+
+        outfitsPerDay[normalizedDate]!.add(outfit);
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading outfits: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _updateOutfit(int outfitIndex) async {
+    final normalizedDate = _normalizeDate(selectedDate);
+    final outfit = outfitsPerDay[normalizedDate]![outfitIndex];
+
+    // Make sure we have a valid ID
+    if (outfit.id != null && outfit.id!.isNotEmpty) {
+      try {
+        await OutfitStorageService.updateOutfit(outfit);
+        print('Outfit updated in storage: ${outfit.id}');
+      } catch (e) {
+        print('Error updating outfit: $e');
+      }
+    } else {
+      // If outfit has no ID yet, save it as a new outfit
+      try {
+        await OutfitStorageService.saveOutfit(outfit);
+        print('New outfit saved to storage');
+      } catch (e) {
+        print('Error saving new outfit: $e');
+      }
+    }
+  }
+
+  // Moved _saveOutfit inside the class
+  Future<void> _saveOutfit(Outfit outfit) async {
+    try {
+      await OutfitStorageService.saveOutfit(outfit);
+
+      // Update the local map
+      final normalizedDate = _normalizeDate(outfit.date);
+      setState(() {
+        if (!outfitsPerDay.containsKey(normalizedDate)) {
+          outfitsPerDay[normalizedDate] = [];
+        }
+
+        outfitsPerDay[normalizedDate]!.add(outfit);
+      });
+    } catch (e) {
+      print('Error saving outfit: $e');
+    }
+  }
 }

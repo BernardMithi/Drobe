@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'itemSelection.dart';
+import 'dart:io';
+import 'package:drobe/models/outfit.dart';
+import 'dart:math' as math;
+import 'package:drobe/utils/image_utils.dart';
+import 'package:hive/hive.dart';
+import 'package:drobe/models/item.dart';
+import 'package:drobe/services/outfitStorage.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+
 
 class CreateOutfitPage extends StatefulWidget {
   final List<Color> colorPalette;
   final List<Outfit> savedOutfits;
   final DateTime selectedDate;
+
 
   const CreateOutfitPage({
     super.key,
@@ -21,16 +32,17 @@ class CreateOutfitPage extends StatefulWidget {
 class _CreateOutfitPageState extends State<CreateOutfitPage> {
   late DateTime selectedDate;
   final TextEditingController _outfitNameController = TextEditingController();
+  bool _isGenerating = false;
 
   // Store color tiles from the chosen palette
   late List<ColorTile> _paletteTiles;
 
   // Map holding the selected image URL for each clothing slot
   Map<String, String?> chosenClothes = {
-    'Layer': null,
-    'Shirt': null,
-    'Bottoms': null,
-    'Shoes': null,
+    'LAYER': null,
+    'SHIRT': null,
+    'BOTTOMS': null,
+    'SHOES': null,
   };
 
   // List for accessories
@@ -52,10 +64,17 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
   }
 
   @override
+  void dispose() {
+    // Add dispose for text controller to prevent memory leaks
+    _outfitNameController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CREATE AN OUTFIT'),
+        title: const Text('CREATE AN OUTFIT',style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -69,24 +88,27 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
       floatingActionButton: _buildFABs(),
 
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 132),
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 115),
         child: Column(
           children: [
             // ** Outfit Name Field **
             TextField(
               controller: _outfitNameController,
+              style: const TextStyle(
+                fontSize: 14, // 👈 Smaller font size
+              ),
               decoration: const InputDecoration(
-                labelText: 'Outfit Name',
+                labelText: 'OUTFIT NAME',
+                labelStyle: TextStyle(
+                  fontSize: 15, // 👈 Optional: smaller label too
+                  fontWeight: FontWeight.w500,
+                ),
                 border: OutlineInputBorder(),
               ),
               onChanged: (_) {
-                // Rebuild so "Save" FAB can enable/disable
                 setState(() {});
               },
             ),
-            const SizedBox(height: 6),
-
-
 
             const SizedBox(height: 10),
 
@@ -107,7 +129,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
             // **Outfit Section: Clothes + Accessories**
             Expanded(
@@ -117,9 +139,9 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
                   borderRadius: BorderRadius.circular(5),
                 ),
                 padding: const EdgeInsets.all(10),
+                width: double.infinity,
                 child: Column(
                   children: [
-                    // Clothing Grid (4 items)
                     Expanded(
                       flex: 3,
                       child: GridView.count(
@@ -128,52 +150,46 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
                         mainAxisSpacing: 10,
                         childAspectRatio: 1,
                         physics: const NeverScrollableScrollPhysics(),
-                        children: chosenClothes.entries.map((entry) {
-                          final category = entry.key;
-                          final imageUrl = entry.value;
-                          return _buildClothingTile(category, imageUrl);
-                        }).toList(),
+                        children: [
+                          _buildClothingTile('LAYER'),
+                          _buildClothingTile('SHIRT'),
+                          _buildClothingTile('BOTTOMS'),
+                          _buildClothingTile('SHOES'),
+                        ],
                       ),
                     ),
 
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "ACCESSORIES",
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    // Horizontal Accessories row
-                    SizedBox(
-                      height: 80,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: chosenAccessories.length + 1,
-                        itemBuilder: (context, index) {
-                          // "Add Accessory" slot
-                          if (index == chosenAccessories.length) {
-                            return GestureDetector(
-                              onTap: () => _onEditAccessory(index),
-                              child: Container(
-                                width: 80,
-                                height: 80,
-                                margin: const EdgeInsets.only(right: 6),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey),
-                                  borderRadius: BorderRadius.circular(2),
+                    const SizedBox(height: 10),
+
+                    // Accessories Row
+                    Expanded(
+                      flex: 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ACCESSORIES',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Expanded(
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: [
+                                // Use a more dynamic approach for accessories
+                                ...List.generate(
+                                  // Show selected accessories + one empty tile
+                                  math.max(1, chosenAccessories.length + 1),
+                                      (index) => index < chosenAccessories.length
+                                      ? _buildAccessoryTile(index)
+                                      : _buildAccessoryTile(null),
                                 ),
-                                child: const Icon(Icons.add, color: Colors.grey),
-                              ),
-                            );
-                          } else {
-                            // Display existing accessory
-                            final accessoryUrl = chosenAccessories[index];
-                            return _buildAccessoryTile(index, accessoryUrl);
-                          }
-                        },
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -186,227 +202,616 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
     );
   }
 
-  /// FAB row with "Generate" & "Save"
-  Widget _buildFABs() {
-    return SizedBox(
-      width: MediaQuery.of(context).size.width,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+  // Build empty tile with no image
+  Widget _buildEmptyTile(String category) {
+    return GestureDetector(
+      onTap: () => _selectItem(category),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: _buildClothingPlaceholder(category),
+      ),
+    );
+  }
 
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Generate outfit
-            FloatingActionButton(
-              heroTag: 'generateBtn',
-              backgroundColor: Colors.grey,
-              onPressed: _autoGenerateOutfit,
-              child: const Icon(Icons.auto_fix_high, color: Colors.black),
+  // Build clothing tile with image & selection logic
+  Widget _buildClothingTile(String category) {
+    final String? imageUrl = chosenClothes[category];
+    print('Building clothing tile for $category with URL: $imageUrl');
+
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return _buildEmptyTile(category);
+    }
+
+    return GestureDetector(
+      onTap: () => _selectItem(category),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(5),
             ),
-            // Save outfit
-            FloatingActionButton(
-              heroTag: 'saveBtn',
-              backgroundColor: canSave ? Colors.grey : Colors.grey[400],
-              onPressed: canSave ? _onSaveOutfit : null,
-              child: const Icon(Icons.check, color: Colors.black),
+            clipBehavior: Clip.antiAlias,
+            child: _buildImageWidget(imageUrl),
+          ),
+          // Add X button to remove the selected item
+          Positioned(
+            top: 5,
+            right: 5,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  chosenClothes[category] = null;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper to build image widget with proper handling of different sources
+  Widget _buildImageWidget(String imageUrl) {
+    print('Building image widget for: $imageUrl');
+
+    if (imageUrl.startsWith('http')) {
+      // Network image handling
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading network image: $error');
+          return _buildErrorImagePlaceholder();
+        },
+      );
+    } else {
+      // Use FutureBuilder to handle async image path resolution
+      return FutureBuilder<String>(
+        future: getAbsoluteImagePath(imageUrl), // Convert relative path to absolute path
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasData) {
+            final absPath = snapshot.data!;
+            print('Loading image from absolute path: $absPath');
+
+            final file = File(absPath);
+            if (!file.existsSync()) {
+              print('Error: File not found at path $absPath');
+              return _buildErrorImagePlaceholder();
+            }
+
+            return Image.file(
+              file,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                print('Error loading file image: $error');
+                return _buildErrorImagePlaceholder();
+              },
+            );
+          } else {
+            print('Error: Unable to resolve image path');
+            return _buildErrorImagePlaceholder();
+          }
+        },
+      );
+    }
+  }
+  // Clothing placeholder - just text, no icon, no background
+  Widget _buildClothingPlaceholder([String? category]) {
+    return Center(
+      child: Text(
+        category ?? '',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          color: Colors.grey,
         ),
       ),
     );
   }
 
-  /// Convert DateTime -> String
-  String _formatDate(DateTime date) {
-    return DateFormat('EEEE, d MMMM y').format(date);
-  }
-
-  /// Decrement the selected date by 1 day
-  void _previousDay() {
-    setState(() {
-      selectedDate = selectedDate.subtract(const Duration(days: 1));
-      // Optional guard
-      if (selectedDate.isBefore(DateTime(2020))) {
-        selectedDate = DateTime(2020);
-      }
-    });
-  }
-
-  /// Increment the selected date by 1 day
-  void _nextDay() {
-    setState(() {
-      selectedDate = selectedDate.add(const Duration(days: 1));
-      // Optional guard
-      if (selectedDate.isAfter(DateTime(2030))) {
-        selectedDate = DateTime(2030);
-      }
-    });
-  }
-
-  /// Show the date picker
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
+  // Accessory placeholder - just plus icon, no text, no background
+  Widget _buildAccessoryPlaceholder() {
+    return const Center(
+      child: Icon(
+        Icons.add,
+        size: 32,
+        color: Colors.grey,
+      ),
     );
-    if (picked != null) {
+  }
+
+  Widget _buildErrorImagePlaceholder() {
+    return Container(
+      color: Colors.grey.shade100,
+      child: const Center(
+        child: Icon(
+          Icons.broken_image,
+          size: 40,
+          color: Colors.red,
+        ),
+      ),
+    );
+  }
+
+  // Build accessory item tile - modified to ensure square proportions
+  Widget _buildAccessoryTile([int? index]) {
+    final bool hasImage = index != null && index < chosenAccessories.length;
+    final String? imageUrl = hasImage ? chosenAccessories[index] : null;
+
+    // Calculate the height based on available space
+    // Using AspectRatio to force a square shape
+    return AspectRatio(
+      aspectRatio: 1, // This forces a square shape
+      child: GestureDetector(
+        onTap: () {
+          if (hasImage) {
+            // Allow replacing or removing existing accessories
+            _editAccessory(index);
+          } else {
+            // Add new accessory
+            _selectAccessory();
+          }
+        },
+        child: Container(
+          margin: const EdgeInsets.only(right: 5),
+          child: Stack(
+            fit: StackFit.expand, // Make sure stack fills the container
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: imageUrl != null && imageUrl.isNotEmpty
+                    ? _buildImageWidget(imageUrl)
+                    : _buildAccessoryPlaceholder(), // Use accessory-specific placeholder
+              ),
+              if (hasImage && imageUrl != null)
+                Positioned(
+                  top: 5,
+                  right: 5,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        chosenAccessories.removeAt(index);
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Show options to edit or remove an accessory
+  void _editAccessory(int index) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Replace'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _selectAccessory(index);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Remove'),
+                onTap: () {
+                  setState(() {
+                    chosenAccessories.removeAt(index);
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Build the floating action buttons
+  Widget _buildFABs() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'generate_fab',
+            onPressed: _isGenerating ? null : _generateOutfit,
+            label: _isGenerating
+                ? const Text('GENERATING...')
+                : const Text('GENERATE'),
+            backgroundColor: Colors.grey[300],
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(5),
+            ),
+          ),
+
+          // Save Button - Conditionally enabled
+          FloatingActionButton(
+            onPressed: canSave ? _saveOutfit : null,
+            backgroundColor: Colors.grey[300], // ✅ Light Grey (matches avatar)
+            foregroundColor: Colors.black, // ✅ Black icon color
+            shape: const CircleBorder(), // ✅ Ensures a perfect circle
+            child: const Icon(Icons.check, size: 28), // ✅ Same icon & size as avatar
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Generate random outfit
+  Future<void> _generateOutfit() async {
+    if (_isGenerating) return; // Prevent multiple generations
+
+    setState(() {
+      _isGenerating = true;
+    });
+
+    // Generate a random outfit name if empty
+    if (_outfitNameController.text.trim().isEmpty) {
+      final adjectives = ['Cool', 'Casual', 'Elegant', 'Stylish', 'Chic', 'Modern', 'Classic'];
+      final nouns = ['Look', 'Outfit', 'Style', 'Ensemble', 'Attire'];
+      final random = math.Random();
+      final adjective = adjectives[random.nextInt(adjectives.length)];
+      final noun = nouns[random.nextInt(nouns.length)];
+      _outfitNameController.text = '$adjective $noun';
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      // Process each clothing category
+      for (final category in chosenClothes.keys) {
+        bool success = await _ensureItemSelected(category);
+        if (success) {
+          print('Item selected for $category: ${chosenClothes[category]}');
+        } else {
+          print('Warning: Failed to select item for $category');
+        }
+      }
+
+      // Handle accessories - clear existing and add new ones
       setState(() {
-        selectedDate = picked;
+        chosenAccessories.clear();
+      });
+
+      final random = math.Random();
+      final accessoryCount = random.nextInt(3); // 0-2 accessories
+
+      for (int i = 0; i < accessoryCount; i++) {
+        await _selectRandomAccessory();
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    } catch (e) {
+      print('Error generating outfit: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error generating outfit: $e')),
+      );
+    } finally {
+      // Dismiss loading indicator
+      if (context.mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      setState(() {
+        _isGenerating = false;
       });
     }
   }
 
-  void _autoGenerateOutfit() {
-    setState(() {
-      chosenClothes['Layer'] = 'https://www.nomadfoods.com/wp-content/uploads/2018/08/placeholder-1-e1533569576673.png';
-      chosenClothes['Shirt'] = 'https://www.nomadfoods.com/wp-content/uploads/2018/08/placeholder-1-e1533569576673.png';
-      chosenClothes['Bottoms'] = 'https://www.nomadfoods.com/wp-content/uploads/2018/08/placeholder-1-e1533569576673.png';
-      chosenClothes['Shoes'] = 'https://www.nomadfoods.com/wp-content/uploads/2018/08/placeholder-1-e1533569576673.png';
+  Future<bool> _ensureItemSelected(String category) async {
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        final items = await _getItemsForCategory(category);
 
-      chosenAccessories
-        ..clear()
-        ..add('https://www.nomadfoods.com/wp-content/uploads/2018/08/placeholder-1-e1533569576673.png');
-    });
+        if (items.isEmpty) {
+          print('No items available for category: $category');
+          return false;
+        }
+
+        final random = math.Random();
+        final selectedItem = items[random.nextInt(items.length)];
+        final selectedImageUrl = selectedItem.imageUrl;
+
+        print('About to update state for $category with URL: $selectedImageUrl');
+
+        // Get absolute path and verify file exists
+        final absPath = await getAbsoluteImagePath(selectedImageUrl);
+        final file = File(absPath);
+        final exists = await file.exists();
+
+        if (exists) {
+          setState(() {
+            // Store the FULL absolute path in state
+            chosenClothes[category] = absPath;
+          });
+          return true;
+        }
+        else {
+          print('File does not exist, trying another item...');
+        }
+      } catch (e) {
+        print('Error selecting item for $category (attempt ${attempt + 1}): $e');
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    }
+    return false;
   }
 
-  /// Actually build each tile in the clothing grid
-  Widget _buildClothingTile(String category, String? imageUrl) {
-    final isEmpty = (imageUrl == null || imageUrl.isEmpty);
+  // Helper method to get items for a specific category
+  Future<List<Item>> _getItemsForCategory(String category) async {
+    final itemsBox = Hive.box('itemsBox');
 
-    return GestureDetector(
-      onTap: () => _onEditClothing(category),
-      onLongPress: () => setState(() => chosenClothes[category] = null),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.grey.shade300),
-          image: !isEmpty
-              ? DecorationImage(
-            image: NetworkImage(imageUrl!),
-            fit: BoxFit.cover,
-          )
-              : null,
-        ),
-        child: isEmpty
-            ? Center(
-          child: Text(
-            category.toUpperCase(),
-            style: const TextStyle(color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        )
-            : null,
-      ),
-    );
+    // Handle singular/plural mismatches
+    String categoryToMatch = category.toLowerCase();
+
+    // Convert from UI category to database category if needed
+    String dbCategory;
+    if (categoryToMatch == "layer") dbCategory = "layers";
+    else if (categoryToMatch == "shirt") dbCategory = "shirts";
+    else if (categoryToMatch == "bottoms") dbCategory = "bottoms";
+    else if (categoryToMatch == "shoes") dbCategory = "shoes";
+    else dbCategory = categoryToMatch;
+
+    final filteredItems = itemsBox.values
+        .cast<Item>()
+        .where((item) {
+      String itemCategory = item.category.toLowerCase();
+      return itemCategory == dbCategory;
+    })
+        .toList();
+
+    return filteredItems;
   }
 
-  /// Build each accessory tile
-  Widget _buildAccessoryTile(int index, String? imageUrl) {
-    final isEmpty = (imageUrl == null || imageUrl.isEmpty);
+  // Helper method to select a random accessory
+  // Modified method to select a random accessory without UI flash
+  // Make sure to check for null before accessing or casting values
+  Future<void> _selectRandomAccessory() async {
+    try {
+      // Create a set of already selected accessory URLs to check for duplicates
+      final selectedAccessoryUrls = chosenAccessories
+          .where((url) => url != null)
+          .toSet();
 
-    return GestureDetector(
-      onTap: () => _onEditAccessory(index),
-      onLongPress: () {
-        // Remove the accessory
-        setState(() {
-          chosenAccessories.removeAt(index);
-        });
-      },
-      child: Container(
-        width: 80,
-        height: 80,
-        margin: const EdgeInsets.only(right: 6),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(2),
-          image: !isEmpty
-              ? DecorationImage(
-            image: NetworkImage(imageUrl!),
-            fit: BoxFit.cover,
-          )
-              : null,
-        ),
-        child: isEmpty
-            ? const Icon(Icons.add, color: Colors.grey)
-            : null,
-      ),
-    );
+      // Get accessories directly without navigating to selection page
+      final accessories = await _getItemsForCategory('Accessories');
+
+      if (accessories.isEmpty) return;
+
+      // Keep trying until we find a non-duplicate or hit a reasonable limit
+      int attempts = 0;
+      bool foundNewAccessory = false;
+
+      while (!foundNewAccessory && attempts < 5) {
+        attempts++;
+
+        // Select a random accessory
+        final random = math.Random();
+        final selectedItem = accessories[random.nextInt(accessories.length)];
+        final newAccessoryUrl = selectedItem.imageUrl;
+
+        // Check if this accessory is already selected
+        if (newAccessoryUrl != null && !selectedAccessoryUrls.contains(newAccessoryUrl)) {
+          foundNewAccessory = true;
+          setState(() {
+            chosenAccessories.add(newAccessoryUrl);
+          });
+        }
+      }
+    } catch (e) {
+      print('Error selecting random accessory: $e');
+    }
   }
 
-  /// Saves the outfit and returns to OutfitsPage
-  void _onSaveOutfit() {
-    if (!canSave) return;
-
-    final outfit = Outfit(
-      name: _outfitNameController.text.trim(),
-      date: selectedDate,
-      clothes: Map.from(chosenClothes),
-      accessories: List.from(chosenAccessories),
-    );
-
-    Navigator.pop(context, outfit);
-  }
-
-  /// Edit a particular clothing category
-  Future<void> _onEditClothing(String category) async {
-    final result = await Navigator.push<Map<String, dynamic>>(
+  // Logic for selecting a clothing item - updated to properly filter by category
+  void _selectItem(String category) async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ItemSelectionPage(
-          slot: category,
+        builder: (context) => ItemSelectionPage(
+          slot: category,  // This will be used to filter items by category
           fromCreateOutfit: true,
         ),
       ),
     );
 
-    if (result != null && mounted) {
+    if (result != null && result is Map && result.containsKey('item')) {
       setState(() {
-        chosenClothes[category] = result['item'].imageUrl as String?;
+        // Assuming the result contains an item object with imageUrl
+        chosenClothes[category] = result['item'].imageUrl;
       });
     }
   }
 
-  /// Edit or add an accessory
-  Future<void> _onEditAccessory(int index) async {
-    final result = await Navigator.push<Map<String, dynamic>>(
+  // Logic for selecting an accessory - similar to _selectItem but for accessories
+  void _selectAccessory([int? replaceIndex]) async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ItemSelectionPage(fromCreateOutfit: true),
+        builder: (context) => ItemSelectionPage(
+          slot: 'Accessories', // This filters items to show only accessories
+          fromCreateOutfit: true,
+        ),
       ),
     );
 
-    if (result != null && mounted) {
-      final newUrl = result['item'].imageUrl as String?;
+    if (result != null && result is Map && result.containsKey('item')) {
       setState(() {
-        if (index < chosenAccessories.length) {
-          chosenAccessories[index] = newUrl;
+        if (replaceIndex != null && replaceIndex < chosenAccessories.length) {
+          // Replace existing accessory
+          chosenAccessories[replaceIndex] = result['item'].imageUrl;
         } else {
-          chosenAccessories.add(newUrl);
+          // Add new accessory
+          chosenAccessories.add(result['item'].imageUrl);
         }
       });
     }
   }
+
+  void _saveOutfit() async {
+    if (!canSave) return;
+
+    try {
+      // Create a list to track all image paths for verification
+      List<String> imagePaths = [];
+
+      // Process and verify all clothing image paths in the outfit
+      Map<String, String> verifiedClothes = {};
+      for (final entry in chosenClothes.entries) {
+        if (entry.value != null) {  // Add null check
+          final imagePath = await _ensureProperImagePath(entry.value);
+          if (imagePath != null) {  // Add null check
+            verifiedClothes[entry.key] = imagePath;
+            imagePaths.add(imagePath);
+          }
+        }
+      }
+
+      // Process and verify all accessories image paths
+      List<String> verifiedAccessories = [];
+      for (final accessoryPath in chosenAccessories) {
+        if (accessoryPath != null) {  // Add null check
+          final verifiedPath = await _ensureProperImagePath(accessoryPath);
+          if (verifiedPath != null) {  // Add null check
+            verifiedAccessories.add(verifiedPath);
+            imagePaths.add(verifiedPath);
+          }
+        }
+      }
+
+      // Log all image paths for debugging
+      print('Saving outfit with the following images:');
+      for (final path in imagePaths) {
+        bool exists = await File(path).exists();
+        print('  - $path (exists: $exists)');
+      }
+
+      // Create a new outfit object with verified paths
+      final newOutfit = Outfit(
+        name: _outfitNameController.text.trim(),
+        clothes: verifiedClothes,
+        accessories: verifiedAccessories,
+        date: selectedDate,
+        colorPalette: widget.colorPalette,
+        // Note: assuming ID is handled internally or in the storage service
+      );
+
+      // Save using the storage service
+      await OutfitStorageService.saveOutfit(newOutfit);
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Outfit saved successfully!')),
+      );
+
+      // Return to previous screen
+      Navigator.pop(context, newOutfit);
+    } catch (e) {
+      // Show error message
+      print('Error saving outfit: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save outfit: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<String?> _ensureProperImagePath(String? imagePath) async {
+    if (imagePath == null || imagePath.isEmpty) return null;
+
+    try {
+      // If it's a network image, return as is
+      if (imagePath.startsWith('http')) {
+        return imagePath;
+      }
+
+      // Try to use the path directly first
+      if (await File(imagePath).exists()) {
+        return imagePath;
+      }
+
+      // Get the app's documents directory
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = path.basename(imagePath);
+
+      // Try to find the file in different locations
+      final wardrobeImagesPath = path.join(appDir.path, 'wardrobe_images');
+      final wardrobePath = path.join(wardrobeImagesPath, fileName);
+
+      if (await File(wardrobePath).exists()) {
+        return wardrobePath;
+      }
+
+      // Try in the main documents directory
+      final possiblePath = path.join(appDir.path, fileName);
+      if (await File(possiblePath).exists()) {
+        return possiblePath;
+      }
+
+      return imagePath; // Return original path as fallback
+    } catch (e) {
+      print('Error resolving path: $e');
+      return imagePath; // Return original path in case of error
+    }
+  }
 }
 
-/// Represents the chosen color swatch in the palette
+// Simple ColorTile class
 class ColorTile {
   final Color color;
   ColorTile({required this.color});
-}
-
-/// Represents an Outfit object with a name
-class Outfit {
-  final String name;             // New: outfit name
-  final DateTime date;           // The selected day
-  final Map<String, String?> clothes;     // 4 clothing slots
-  final List<String?> accessories;        // Accessory list
-
-  Outfit({
-    required this.name,
-    required this.date,
-    required this.clothes,
-    required this.accessories,
-  });
 }

@@ -7,15 +7,22 @@ import 'package:geolocator/geolocator.dart';
 import 'Outfits/outfits.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-
+import 'package:drobe/models/item.dart';
+import 'package:drobe/services/outfitStorage.dart';
+import 'package:drobe/models/outfit.dart';
 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive correctly
   await Hive.initFlutter();
-  await Hive.openBox('itemsBox'); // Ensure Hive box is opened
+  Hive.registerAdapter(ItemAdapter());
+  Hive.registerAdapter(OutfitAdapter());
+
+
+  await Hive.openBox('itemsBox');
+  await Hive.openBox<Outfit>('outfits');
+  await OutfitStorageService.init();
 
   runApp(const MyApp());
 }
@@ -55,7 +62,6 @@ Widget build(BuildContext context) {
         Column(
           children: [
             const SizedBox(height: 200),
-            // ✅ Pass callback
             Icon(weatherIcon, size: 60, color: Colors.blue), // ✅ Use updated icon
           ],
         ),

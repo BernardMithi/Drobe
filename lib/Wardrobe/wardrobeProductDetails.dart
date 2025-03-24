@@ -3,11 +3,11 @@ import 'editItem.dart';
 import 'package:hive/hive.dart';
 import 'dart:io';
 import 'package:drobe/models/item.dart';
-import 'package:drobe/Wardrobe/editItem.dart';
+import 'package:path_provider/path_provider.dart';
 
 class ProductDetailsPage extends StatefulWidget {
-  final int itemIndex; // Index to retrieve the item from Hive
-  const ProductDetailsPage({Key? key, required this.itemIndex}) : super(key: key);
+  final Item item;
+  const ProductDetailsPage({Key? key, required this.item}) : super(key: key);
 
   @override
   _ProductDetailsPageState createState() => _ProductDetailsPageState();
@@ -16,22 +16,37 @@ class ProductDetailsPage extends StatefulWidget {
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
   late Box itemsBox;
   late Item item;
+  late List<int> _selectedColors;
+  String? _fullImagePath;
 
   @override
   void initState() {
     super.initState();
-    itemsBox = Hive.box('itemsBox'); // Ensure this box is opened elsewhere
-    _loadItem();
+    itemsBox = Hive.box('itemsBox');
+    item = widget.item;
+    _selectedColors = item.colors ?? [];
+
+    // Get the full image path
+    _getFullImagePath();
   }
 
-  void _loadItem() {
-    item = itemsBox.getAt(widget.itemIndex) as Item;
-  }
+  // Add this method to get the full path
+  Future<void> _getFullImagePath() async {
+    if (item.imageUrl.isNotEmpty && !item.imageUrl.startsWith("http")) {
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        final fullPath = "${directory.path}/${item.imageUrl}";
+        final file = File(fullPath);
 
-  void _markAsWorn() {
-    setState(() {
-      item.markAsWorn();
-    });
+        if (file.existsSync()) {
+          setState(() {
+            _fullImagePath = fullPath;
+          });
+        }
+      } catch (e) {
+        print("Error getting full path: $e");
+      }
+    }
   }
 
   void _moveToLaundry() {
@@ -46,114 +61,204 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     });
   }
 
-  // Refresh the item after editing
-  void _reloadItemFromHive() {
-    setState(() {
-      _loadItem();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    List<Color> colorPalette = item.colors?.map((val) => Color(val)).toList() ?? [];
+    // Check if the item is an accessory
+    bool isAccessory = item.category.toLowerCase() == "accessories";
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(item.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EditItemPage(itemIndex: widget.itemIndex),
-                ),
-              );
-              _reloadItemFromHive();
+              int itemIndex = itemsBox.values.toList().indexWhere((i) => i.id == item.id);
+              if (itemIndex != -1) {
+                final result = await Navigator.push<dynamic>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditItemPage(itemIndex: itemIndex),
+                  ),
+                );
+
+                if (result == true) {
+                  // ✅ Navigate back to `wardrobeCategory.dart` if item was deleted
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                } else if (result is Item) {
+                  setState(() {
+                    item = result;
+                    _selectedColors = List<int>.from(item.colors ?? []);
+
+                    // Reset the full path and recalculate it
+                    _fullImagePath = null;
+                    _getFullImagePath();
+                  });
+                }
+              }
             },
           ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Display product image or a placeholder
-            if (item.imageUrl.isNotEmpty && File(item.imageUrl).existsSync())
-              Image.file(File(item.imageUrl), height: 200, width: double.infinity, fit: BoxFit.cover)
-            else
-              Container(
-                height: 200,
-                width: double.infinity,
-                color: Colors.grey[300],
-                child: const Icon(Icons.image_not_supported, size: 80, color: Colors.grey),
-              ),
-            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () {},
+              child: Container(
+                height: 400,
+                width: 400,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Builder(
+                  builder: (context) {
+                    if (item.imageUrl.isEmpty) {
+                      return const Icon(Icons.image, size: 100, color: Colors.grey);
+                    }
 
-            // Item Name
+                    if (item.imageUrl.startsWith("http")) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          item.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            print("Error loading network image: $error");
+                            return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    } else if (_fullImagePath != null) {
+                      // Use the full path if available
+                      final file = File(_fullImagePath!);
+                      try {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            file,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              print("Error loading file image with full path: $error");
+                              return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
+                            },
+                          ),
+                        );
+                      } catch (e) {
+                        print("Error showing image with full path: $e");
+                        return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
+                      }
+                    } else {
+                      // Fallback to trying the direct path
+                      try {
+                        final file = File(item.imageUrl);
+                        if (file.existsSync()) {
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              file,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                print("Error loading file image: $error");
+                                return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
+                              },
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        print("Error checking file: $e");
+                      }
+                      return const Icon(Icons.image_not_supported, size: 100, color: Colors.grey);
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
             Text(
               item.name,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 8),
-            // Wear Status Display
             Text(
-              "Status: ${item.wearStatus}",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              item.description,
+              style: const TextStyle(fontSize: 15, color: Colors.grey),
             ),
-
-            const SizedBox(height: 8),
-            // Description
-            Text(item.description),
-
-            const SizedBox(height: 16),
-            // Color Palette Display
-            const Text('Color Palette:', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 30),
+            // Only show status if the item is NOT an accessory
+            if (!isAccessory)
+              Text(
+                item.inLaundry ? "Status: In Laundry" : "Status: Clean",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+              ),
+            const SizedBox(height: 20),
             Wrap(
               spacing: 8.0,
               runSpacing: 8.0,
-              children: colorPalette.map((color) {
+              children: _selectedColors.map((colorInt) {
                 return Container(
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: color,
+                    color: Color(colorInt),
                     border: Border.all(color: Colors.black12),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(40),
                   ),
                 );
               }).toList(),
             ),
 
-            const SizedBox(height: 16),
-            // "Mark as Worn" Button
-            ElevatedButton.icon(
-              onPressed: _markAsWorn,
-              icon: const Icon(Icons.check),
-              label: const Text("Mark as Worn"),
-            ),
-
-            const SizedBox(height: 8),
-            // "Move to Laundry" Button
-            ElevatedButton.icon(
-              onPressed: _moveToLaundry,
-              icon: const Icon(Icons.local_laundry_service),
-              label: const Text("Move to Laundry"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            ),
-
-            const SizedBox(height: 8),
-            // "Mark as Clean" Button
-            ElevatedButton.icon(
-              onPressed: _markAsClean,
-              icon: const Icon(Icons.cleaning_services),
-              label: const Text("Mark as Clean"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-            ),
+            // Only show laundry buttons if the item is NOT an accessory
+            if (!isAccessory) ...[
+              Expanded(child: Container()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 42.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _moveToLaundry,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[300],
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text("IN LAUNDRY"),
+                    ),
+                    ElevatedButton(
+                      onPressed: _markAsClean,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[300],
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text("MARK AS CLEAN"),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

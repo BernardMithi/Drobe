@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:math' show min;
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:drobe/models/item.dart';
+import 'package:drobe/services/removeBackground.dart';
+import 'package:image/image.dart' as img;
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:drobe/utils/image_utils.dart';
 
 class AddItemPage extends StatefulWidget {
   final String category;
@@ -36,18 +42,15 @@ class _AddItemPageState extends State<AddItemPage> {
   void _showImageSourceOptions() {
     showModalBottomSheet(
       context: context,
-      // Rounded corners at the top
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
-      // Optional: you can also specify backgroundColor if desired
       builder: (context) {
         return SafeArea(
-          // Use a Column with a small drag handle at the top
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Drag handle for a more polished look
+              // Drag handle for a polished look
               Container(
                 width: 40,
                 height: 4,
@@ -57,7 +60,6 @@ class _AddItemPageState extends State<AddItemPage> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              // The original list of options
               ListTile(
                 leading: const Icon(Icons.camera_alt),
                 title: const Text('Take Photo'),
@@ -92,17 +94,12 @@ class _AddItemPageState extends State<AddItemPage> {
 
   /// Pick Image from Camera or Gallery
   Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source);
+    final pickedFile = await ImagePicker().pickImage(source: source);
     if (pickedFile != null) {
-      File imageFile = File(pickedFile.path);
       setState(() {
-        _selectedImage = imageFile;
-        _imageUrl = null; // Clear any previously entered URL
+        _selectedImage = File(pickedFile.path);
+        _imageUrl = null;
       });
-
-      // Extract colors from image
-      await _extractColorsFromImage(imageFile);
     }
   }
 
@@ -123,12 +120,10 @@ class _AddItemPageState extends State<AddItemPage> {
               child: const Text("Cancel"),
             ),
             ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _imageUrl = _imageUrlController.text.trim();
-                  _selectedImage = null; // Clear any previously selected file
-                });
+              onPressed: () async {
+                final url = _imageUrlController.text.trim();
                 Navigator.pop(context);
+                await _processImageFromUrl(url);
               },
               child: const Text("Confirm"),
             ),
@@ -136,6 +131,91 @@ class _AddItemPageState extends State<AddItemPage> {
         );
       },
     );
+  }
+
+  /// Download image from URL, remove background, and update state.
+  /// Process image from URL with proper error handling and directory creation
+  Future<void> _processImageFromUrl(String url) async {
+    if (!mounted) return;
+
+    // Show loading indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Downloading image..."))
+    );
+
+    try {
+      // Download the image
+      final response = await http.get(Uri.parse(url));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // First save to a temporary file
+        final tempDir = await getTemporaryDirectory();
+        final tempFile = File('${tempDir.path}/temp_download.png');
+        await tempFile.writeAsBytes(response.bodyBytes);
+
+        // Show background removal in progress
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Removing background..."))
+          );
+        }
+
+        // Remove background from the image
+        final processedFile = await removeBackground(tempFile);
+
+        // If background removal failed, use the original image
+        final fileToSave = processedFile ?? tempFile;
+
+        // Ensure the wardrobe_images directory exists
+        final appDir = await getApplicationDocumentsDirectory();
+        final wardrobeDir = Directory('${appDir.path}/wardrobe_images');
+        if (!await wardrobeDir.exists()) {
+          await wardrobeDir.create(recursive: true);
+        }
+
+        // Generate a unique filename with timestamp
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = 'img_$timestamp.png';
+        final savedFile = File('${wardrobeDir.path}/$fileName');
+
+        // Copy the processed file to the final location
+        await fileToSave.copy(savedFile.path);
+
+        // Update state only if still mounted
+        if (!mounted) return;
+
+        setState(() {
+          _selectedImage = savedFile;
+          _imageUrl = savedFile.path; // Store the local path instead of URL
+        });
+
+        // Show success message with appropriate text based on background removal success
+        if (mounted) {
+          final successMessage = processedFile != null
+              ? "Image downloaded and background removed successfully"
+              : "Image downloaded successfully (background removal failed)";
+
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(successMessage))
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Failed to download image: HTTP ${response.statusCode}"))
+          );
+        }
+      }
+    } catch (e) {
+      print("Error processing URL image: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error processing image: ${e.toString().substring(0, min(50, e.toString().length))}..."))
+        );
+      }
+    }
   }
 
   /// Extract 3 Main Colors from Image
@@ -209,27 +289,54 @@ class _AddItemPageState extends State<AddItemPage> {
   }
 
   /// Save New Item to Hive
-  void _saveItem() {
-    if (_nameController.text.isEmpty || (_selectedImage == null && (_imageUrl == null || _imageUrl!.isEmpty))) {
+// When creating a new item
+  /// Save New Item to Hive
+  Future<void> _saveItem() async {
+    // Check if required fields are filled
+    if (_selectedImage == null && (_imageUrl == null || _imageUrl!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please provide a name and image.")),
+        const SnackBar(content: Text("Please add an image for your item")),
       );
       return;
     }
 
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a name for your item")),
+      );
+      return;
+    }
+
+    // Optional: Check if colors are selected
+    if (_selectedColors.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select at least one color for your item")),
+      );
+      return;
+    }
+
+    String imageUrl = '';
+
+    if (_selectedImage != null) {
+      // Convert File to String path
+      imageUrl = await saveImagePermanently(_selectedImage!);
+    } else if (_imageUrl != null && _imageUrl!.startsWith('http')) {
+      imageUrl = _imageUrl!;
+    }
+
     final newItem = Item(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      imageUrl: _selectedImage != null ? _selectedImage!.path : _imageUrl!,
+      id: DateTime.now().toString(),
+      imageUrl: imageUrl,
       name: _nameController.text,
       description: _descriptionController.text,
+      colors: _selectedColors,
       category: widget.category,
-      colors: _selectedColors, // Store up to 3 selected colors
-      wearCount: 0, // Default wear count (Not Worn)
-      inLaundry: false, // Default status
     );
 
-    itemsBox.add(newItem); // Save to Hive
-    Navigator.pop(context, newItem); // Return item to WardrobeCategoryPage
+    await itemsBox.add(newItem);
+    if (mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   @override
@@ -258,24 +365,43 @@ class _AddItemPageState extends State<AddItemPage> {
                 width: 400,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: _selectedImage != null
                     ? ClipRRect(
                   borderRadius: BorderRadius.circular(2),
-                  child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                  child: Image.file(
+                    // If the file path starts with "file://", remove it.
+                    File(_selectedImage!.path.startsWith("file://")
+                        ? _selectedImage!.path.replaceFirst(RegExp(r'^file://'), '')
+                        : _selectedImage!.path),
+                    fit: BoxFit.cover,
+                  ),
                 )
                     : _imageUrl != null
+                    ? (_imageUrl!.startsWith("http")
                     ? ClipRRect(
                   borderRadius: BorderRadius.circular(2),
                   child: Image.network(_imageUrl!, fit: BoxFit.cover),
                 )
+                    : ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: _selectedImage != null && File(_selectedImage!.path).existsSync()
+                      ? ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: Image.file(File(_selectedImage!.path), fit: BoxFit.cover),
+                  )
+                      : (_imageUrl != null && _imageUrl!.startsWith("http")
+                      ? ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: Image.network(_imageUrl!, fit: BoxFit.cover),
+                  )
+                      : const Icon(Icons.image, size: 100, color: Colors.grey)),
+                ))
                     : const Icon(Icons.image, size: 100, color: Colors.grey),
               ),
             ),
-
             const SizedBox(height: 20),
-
             // Name Input Field
             TextField(
               controller: _nameController,
@@ -285,7 +411,6 @@ class _AddItemPageState extends State<AddItemPage> {
               ),
             ),
             const SizedBox(height: 16),
-
             // Description Input Field
             TextField(
               controller: _descriptionController,
@@ -294,26 +419,41 @@ class _AddItemPageState extends State<AddItemPage> {
                 border: OutlineInputBorder(),
               ),
               maxLines: 2,
+              maxLength: 100,
+
             ),
-
-            const SizedBox(height: 20),
-
+            const SizedBox(height: 5),
             // Color Picker Buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ElevatedButton(
                   onPressed: _openColorPicker,
-                  child: const Text("Select Colors"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[300], // 🔹 Light Grey Background
+                    foregroundColor: Colors.black, // 🔹 Black Text
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text("SELECT COLOURS"),
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton(
                   onPressed: _selectedImage != null ? () => _extractColorsFromImage(_selectedImage!) : null,
-                  child: const Text("Generate Colors"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[300], // 🔹 Light Grey Background
+                    foregroundColor: Colors.black, // 🔹 Black Text
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text("GENERATE COLOURS"),
                 ),
               ],
             ),
-
             // Display Selected Colors
             if (_selectedColors.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -321,29 +461,43 @@ class _AddItemPageState extends State<AddItemPage> {
                 spacing: 8.0,
                 runSpacing: 8.0,
                 children: _selectedColors.map((colorInt) {
-                  return Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: Color(colorInt),
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(4),
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedColors.remove(colorInt); // ✅ Remove color on tap
+                      });
+                    },
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Color(colorInt),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.black12, width: 1),
+                      ),
+                      child: const Icon(Icons.close, size: 16, color: Colors.white), // ✅ X to remove
                     ),
                   );
                 }).toList(),
               ),
-            ],
-          ],
+            ],          ],
         ),
       ),
 
       // Floating Save Button
-      floatingActionButton: FloatingActionButton(
-        onPressed: _saveItem,
-        backgroundColor: Colors.grey[600],
-        child: const Icon(Icons.check, color: Colors.white),
+      floatingActionButton: SizedBox(
+        height: 50, // Smaller height
+        width: 50, // Smaller width
+        child: FloatingActionButton(
+          onPressed: _saveItem,
+          backgroundColor: Colors.grey[300], // Light Grey
+          foregroundColor: Colors.black, // Black Icon
+          shape: const CircleBorder(), // Ensures a perfect circle
+          child: const Icon(Icons.check, color: Colors.black, size: 30), // Smaller icon
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
+

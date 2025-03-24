@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'itemSelection.dart';
 import 'createOutfit.dart';
+import 'package:drobe/models/item.dart';
+import 'package:drobe/models/outfit.dart';
+
+
 
 class ProductDetailsPage extends StatelessWidget {
   final String imageUrl;
@@ -104,14 +108,26 @@ class ProductDetailsPage extends StatelessWidget {
         onPressed: () {
           // Create the selected product.
           final selectedItem = Item(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
             imageUrl: imageUrl,
             name: productName,
-            wearStatus: 'Worn twice this month',
             description: productDescription,
+            category: 'Shirt',
+            wearCount: 2,
+            inLaundry: false,
           );
-          // Pop with the result so that the calling page can update its data.
+
+          // Pop with the result (convert Item to a Map before returning)
           Navigator.pop(context, {
-            'item': selectedItem,
+            'item': {
+              'id': selectedItem.id,
+              'imageUrl': selectedItem.imageUrl,
+              'name': selectedItem.name,
+              'description': selectedItem.description,
+              'category': selectedItem.category,
+              'wearCount': selectedItem.wearCount,
+              'inLaundry': selectedItem.inLaundry,
+            },
             'slot': slot,
           });
         },

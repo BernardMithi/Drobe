@@ -4,12 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:drobe/Outfits/createOutfit.dart';
 import 'outfits.dart';
+import 'package:drobe/models/outfit.dart';
+import 'package:drobe/Outfits/outfits.dart';
+import 'package:drobe/models/item.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class CreatePalettePage extends StatefulWidget {
   final DateTime selectedDate;
 
   const CreatePalettePage({super.key, required this.selectedDate});
-
 
   @override
   State<CreatePalettePage> createState() => _CreatePalettePageState();
@@ -18,13 +22,18 @@ class CreatePalettePage extends StatefulWidget {
 class _CreatePalettePageState extends State<CreatePalettePage> {
   late DateTime selectedDate;
   int _paletteSize = 3;
-
+  bool _isLoading = true;
+  List<ColorTile> _wardrobeColors = []; // To store all wardrobe colors
 
   @override
   void initState() {
     super.initState();
-    selectedDate = widget.selectedDate; // ✅ Assign selectedDate
+    selectedDate = widget.selectedDate;
+    _checkItemsExistence();
+    print('InitState: Loading wardrobe colors...');
+    _loadWardrobeColors();
   }
+
   // Initial palette
   final List<ColorTile> _palette = [
     ColorTile(color: Colors.grey.shade200),
@@ -33,6 +42,98 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
     ColorTile(color: Colors.teal.shade300),
   ];
 
+  // Load all colors from the wardrobe items
+  Future<void> _loadWardrobeColors() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Open the items box from Hive
+      final itemsBox = await Hive.openBox<Item>('itemsBox');
+      final items = itemsBox.values.toList();
+
+      print('Found ${items.length} items in wardrobe'); // Debug log item count
+
+      // Map to track unique colors (using color value as key)
+      final Map<int, ColorTile> colorMap = {};
+
+      for (var item in items) {
+        print('Item: ${item.name}, Colors: ${item.colors}'); // Log each item and its colors
+
+        // Extract colors from item - more forgiving approach
+        if (item.colors != null) {
+          List<int> colorsList = [];
+
+          // Handle different potential formats of item.colors
+          if (item.colors is List<int>) {
+            colorsList = item.colors as List<int>;
+          } else if (item.colors is List<dynamic>) {
+            // Try to convert dynamic list to int list
+            colorsList = (item.colors as List<dynamic>)
+                .whereType<int>()
+                .toList();
+          }
+
+          print('Processed colors list: $colorsList'); // Log processed colors list
+
+          for (int colorValue in colorsList) {
+            // Ensure color value is valid (has alpha channel)
+            final adjustedColorValue = colorValue | 0xFF000000; // Ensure alpha is set
+
+            print('Adding color: 0x${adjustedColorValue.toRadixString(16)}'); // Log each color
+
+            // Add to our map if we haven't seen this color before
+            if (!colorMap.containsKey(adjustedColorValue)) {
+              try {
+                final color = Color(adjustedColorValue);
+                colorMap[adjustedColorValue] = ColorTile(
+                    color: color,
+                    itemName: item.name
+                );
+              } catch (e) {
+                print('Error creating color: $e');
+              }
+            }
+          }
+        }
+      }
+
+      // Convert map values to our available colors list
+      final uniqueColors = colorMap.values.toList();
+      print('Extracted ${uniqueColors.length} unique colors: $uniqueColors'); // Log unique colors
+
+      setState(() {
+        _wardrobeColors = uniqueColors;
+        print('Set _wardrobeColors to ${_wardrobeColors.length} colors'); // Log after setting
+
+        // Generate initial palette from wardrobe colors
+        _updatePaletteWithWardrobeColors();
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading wardrobe colors: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // Update palette with wardrobe colors
+  void _updatePaletteWithWardrobeColors() {
+    // If no wardrobe colors available, keep the default palette
+    if (_wardrobeColors.isEmpty) return;
+
+    // Use wardrobe colors for the palette
+    int count = min(_palette.length, _wardrobeColors.length);
+
+    for (int i = 0; i < count; i++) {
+      if (!_palette[i].isLocked) {
+        _palette[i] = ColorTile(
+            color: _wardrobeColors[i].color,
+            itemName: _wardrobeColors[i].itemName
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // The first _paletteSize tiles
@@ -40,7 +141,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CREATE AN OUTFIT'),
+        title: const Text('CREATE AN OUTFIT',style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -50,7 +151,9 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         ],
       ),
       body: SafeArea(
-        child: Column(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             /// **Title Section**
@@ -143,6 +246,69 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
               ),
             ),
 
+            // Available wardrobe colors
+            if (_wardrobeColors.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "AVAILABLE COLORS IN YOUR WARDROBE",
+                      style: TextStyle(
+                        fontFamily: 'Avenir',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 40,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _wardrobeColors.length,
+                        itemBuilder: (context, index) {
+                          final colorTile = _wardrobeColors[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: GestureDetector(
+                              onTap: () {
+                                // When tapped, replace the first unlocked color in the palette
+                                for (int i = 0; i < _palette.length; i++) {
+                                  if (!_palette[i].isLocked) {
+                                    setState(() {
+                                      _palette[i] = ColorTile(
+                                          color: colorTile.color,
+                                          itemName: colorTile.itemName
+                                      );
+                                    });
+                                    break;
+                                  }
+                                }
+                              },
+                              child: Tooltip(
+                                message: colorTile.itemName ?? "Wardrobe color",
+                                child: Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: colorTile.color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.black12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             /// **Bottom Buttons**
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 16),
@@ -150,52 +316,63 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   /// **Generate Palette Button**
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 16),
-                      backgroundColor: Colors.grey,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
+                  FloatingActionButton.extended(
+                    heroTag: 'generate_btn',
                     onPressed: _generatePalette,
-                    child: const Text("GENERATE",
+                    backgroundColor: Colors.grey[300],
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    label: const Text(
+                      "GENERATE",
                       style: TextStyle(
-                        fontFamily: 'Avenir',   // Apply Avenir font here
-                        fontSize: 14,           // Optional: Adjust size if needed
+                        fontFamily: 'Avenir',
+                        fontSize: 14,
                       ),
                     ),
                   ),
 
-                  /// **Confirm Button** — Now pushes to the next page
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.grey,
-                    child: IconButton(
-                      icon: const Icon(Icons.check, size: 28, color: Colors.black),
-                      onPressed: () {
-                        // Convert the active color tiles to a List<Color>
-                        final chosenColors = activePalette.map((t) => t.color).toList();
+                  /// **Confirm Button**
+                  FloatingActionButton(
+                    onPressed: () {
+                      // Convert the active color tiles to a List<Color>
+                      final chosenColors = activePalette.map((t) => t.color).toList();
 
-                        // Push to your CreateOutfitPage, passing the palette
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CreateOutfitPage(
-                              colorPalette: chosenColors,
-                              savedOutfits: [],
-                              selectedDate: DateTime.now(), // Pass the selected date
-                            ),
+                      // Navigate to CreateOutfitPage with the color palette
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CreateOutfitPage(
+                            colorPalette: chosenColors,
+                            savedOutfits: [],
+                            selectedDate: selectedDate,
                           ),
-                        ).then((newOutfit) {
-                          if (newOutfit != null) {
-                            Navigator.pop(context, newOutfit); // ✅ Send the outfit back to OutfitsPage
+                        ),
+                      ).then((newOutfit) {
+                        if (newOutfit != null) {
+                          Map<String, dynamic> outfitData;
+
+                          if (newOutfit is Map<String, dynamic>) {
+                            outfitData = newOutfit;
+                          } else {
+                            outfitData = {
+                              'name': newOutfit.name ?? "Outfit for ${selectedDate.toString().split(' ')[0]}",
+                              'date': newOutfit.date?.toString() ?? selectedDate.toString(),
+                              'clothes': newOutfit.clothes ?? <String, String?>{},
+                              'accessories': newOutfit.accessories ?? <String>[],
+                              'colorPalette': chosenColors,
+                            };
                           }
-                        });
-                      },
-                    ),
+
+                          Navigator.pop(context, outfitData);
+                        }
+                      });
+                    },
+                    backgroundColor: Colors.grey[300],
+                    foregroundColor: Colors.black,
+                    child: const Icon(Icons.check, size: 28),
+                    shape: const CircleBorder(),
                   ),
                 ],
               ),
@@ -244,6 +421,22 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                 });
               },
             ),
+
+            // Show item source if available
+            if (tile.itemName != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  tile.itemName!,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
           ],
         ),
       ),
@@ -258,7 +451,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        backgroundColor: Colors.grey[200], // Light grey background
+        backgroundColor: Colors.grey[200],
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -315,24 +508,71 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                       backgroundColor: Colors.grey[900],
                       foregroundColor: Colors.white,
                     ),
-                    onPressed: () async {
-                      final chosenColors = _palette.take(_paletteSize).map((tile) => tile.color).toList();
+                    onPressed: () {
+                      String hexColor = colorController.text.trim();
 
-                      // Navigate to CreateOutfitPage and wait for the returned outfit
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CreateOutfitPage(
-                            colorPalette: chosenColors,
-                            savedOutfits: [],
-                            selectedDate: selectedDate, // ✅ Ensure selectedDate is passed
-                          ),
-                        ),
-                      ).then((newOutfit) {
-                        if (newOutfit != null) {
-                          Navigator.pop(context, newOutfit); // ✅ Send new outfit back to OutfitsPage
+                      // If it doesn't start with #, add it
+                      if (!hexColor.startsWith('#') && hexColor.length == 6) {
+                        hexColor = "#$hexColor";
+                      }
+
+                      // Convert hex to Color if valid
+                      Color? newColor;
+                      try {
+                        // Remove # and parse
+                        if (hexColor.startsWith('#') && hexColor.length == 7) {
+                          final hexValue = int.parse('FF${hexColor.substring(1)}', radix: 16);
+                          newColor = Color(hexValue);
                         }
-                      });
+                      } catch (e) {
+                        print('Invalid hex color: $e');
+                      }
+
+                      if (newColor != null) {
+                        // Check if this color exists in the wardrobe
+                        bool colorInWardrobe = false;
+                        for (var wardrobeColor in _wardrobeColors) {
+                          // Allow some flexibility in color matching
+                          // Check if the colors are similar enough
+                          if (_colorsAreSimilar(wardrobeColor.color, newColor)) {
+                            colorInWardrobe = true;
+                            break;
+                          }
+                        }
+
+                        if (!colorInWardrobe) {
+                          // Show warning but still allow using the color
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  "Warning: This color doesn't exist in your wardrobe. "
+                                      "You might not have matching items."
+                              ),
+                              duration: Duration(seconds: 3),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+
+                        // Update the color and close dialog
+                        setState(() {
+                          _palette[i] = ColorTile(
+                            color: newColor!,
+                            isLocked: _palette[i].isLocked,
+                            // Clear the item name since this is a custom color
+                            itemName: colorInWardrobe ? null : "Custom color",
+                          );
+                        });
+                        Navigator.pop(context);
+                      } else {
+                        // Show error for invalid hex
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Invalid HEX color format. Use format #RRGGBB."),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     },
                     child: const Text("OK"),
                   ),
@@ -345,38 +585,71 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
     );
   }
 
-  /// **Generate New Color Palette**
+  /// **Generate New Color Palette from Wardrobe Colors**
   Future<void> _generatePalette() async {
+    print('Wardrobe colors count: ${_wardrobeColors.length}');
+
+    if (_wardrobeColors.isEmpty) {
+      // No wardrobe colors available
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("No colors found in your wardrobe. Add some items with colors first."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() {
-      for (int i = 0; i < _paletteSize; i++) {
-        if (!_palette[i].isLocked) {
-          _palette[i].color = _randomLocalColor(); // Generates a new random color every click
+      List<ColorTile> availableColors = List.from(_wardrobeColors);
+      availableColors.shuffle(); // Randomize the order
+
+      int colorIndex = 0;
+      for (int i = 0; i < _palette.length; i++) {
+        if (!_palette[i].isLocked && colorIndex < availableColors.length) {
+          _palette[i] = ColorTile(
+              color: availableColors[colorIndex].color,
+              itemName: availableColors[colorIndex].itemName
+          );
+          colorIndex++;
         }
+
+        // If we run out of wardrobe colors, wrap around to the beginning
+        if (colorIndex >= availableColors.length) colorIndex = 0;
       }
     });
   }
 
-  /// **Fetch Random Color from API**
-  Future<Color> _fetchRandomColorFromAPI() async {
-    final url = Uri.parse("https://www.colr.org/json/color/random");
-    try {
-      final resp = await http.get(url);
-      final data = jsonDecode(resp.body);
-      final hexStr = (data["colors"][0]["hex"] as String);
-      return Color(int.parse("0xFF$hexStr"));
-    } catch (e) {
-      return _randomLocalColor();
-    }
-  }
+  // Helper method to check if two colors are similar enough
+  bool _colorsAreSimilar(Color color1, Color color2) {
+    // Simple color comparison - you could make this more sophisticated
+    // Currently checking if individual R,G,B components are within a threshold
+    const threshold = 30; // Maximum difference in each color component
 
-  /// Fallback random color if the API fails
-  Color _randomLocalColor() {
-    return Color.fromARGB(
-      255,
-      Random().nextInt(256),
-      Random().nextInt(256),
-      Random().nextInt(256),
-    );
+    return (color1.red - color2.red).abs() <= threshold &&
+        (color1.green - color2.green).abs() <= threshold &&
+        (color1.blue - color2.blue).abs() <= threshold;
+  }
+}
+
+
+Future<void> _checkItemsExistence() async {
+  try {
+    final itemsBox = await Hive.openBox<Item>('items');
+    print('Items box exists: ${itemsBox != null}');
+    print('Items count: ${itemsBox.length}');
+
+    // List all keys in the box
+    print('Item keys: ${itemsBox.keys.toList()}');
+
+    // Try to get the first item if any exists
+    if (itemsBox.isNotEmpty) {
+      final firstKey = itemsBox.keys.first;
+      final firstItem = itemsBox.get(firstKey);
+      print('First item: ${firstItem?.name}, Colors: ${firstItem?.colors}');
+    }
+  } catch (e) {
+    print('Error checking items: $e');
   }
 }
 
@@ -384,6 +657,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 class ColorTile {
   Color color;
   bool isLocked = false;
+  String? itemName; // To track which wardrobe item this color comes from
 
-  ColorTile({required this.color});
+  ColorTile({required this.color, this.isLocked = false, this.itemName});
 }
