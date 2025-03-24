@@ -10,11 +10,10 @@ class ProductDetailsPage extends StatelessWidget {
   final String imageUrl;
   final String productName;
   final String productDescription;
-  final String? slot; // Which clothing slot (e.g., "Shirt", "Layer") is being updated
-  final bool fromCreateOutfit; // true for create outfit flow; false for edit mode
-  // These parameters can be passed so that the caller can rebuild its UI, if needed.
-  final List<Color>? palette; // Provided when fromCreateOutfit is true.
-  final List<Outfit>? savedOutfits; // Provided when fromCreateOutfit is true.
+  final String? slot;
+  final bool fromCreateOutfit;
+  final List<Color>? palette;
+  final List<Outfit>? savedOutfits;
 
   const ProductDetailsPage({
     super.key,

@@ -93,13 +93,57 @@ class _AddItemPageState extends State<AddItemPage> {
   }
 
   /// Pick Image from Camera or Gallery
+  /// Pick Image from Camera or Gallery
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await ImagePicker().pickImage(source: source);
     if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-        _imageUrl = null;
-      });
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Removing background..."))
+        );
+      }
+
+      // Create a File from the picked image path
+      final originalFile = File(pickedFile.path);
+
+      try {
+        // Remove background from the image
+        final processedFile = await removeBackground(originalFile);
+
+        // If background removal was successful, use the processed file
+        // Otherwise fall back to the original file
+        final fileToUse = processedFile ?? originalFile;
+
+        if (mounted) {
+          setState(() {
+            _selectedImage = fileToUse;
+            _imageUrl = null;
+          });
+
+          // Show appropriate message based on background removal success
+          final successMessage = processedFile != null
+              ? "Background removed successfully"
+              : "Image added (background removal failed)";
+
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(successMessage))
+          );
+        }
+      } catch (e) {
+        print("Error removing background: $e");
+        if (mounted) {
+          // If there was an error, still use the original image
+          setState(() {
+            _selectedImage = originalFile;
+            _imageUrl = null;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Background removal failed. Using original image."))
+          );
+        }
+      }
     }
   }
 
