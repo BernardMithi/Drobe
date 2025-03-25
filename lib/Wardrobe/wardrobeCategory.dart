@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'wardrobeProductDetails.dart';
 import 'package:drobe/models/item.dart';
+import 'package:drobe/services/hiveServiceManager.dart'; // Use our service
 import 'package:hive/hive.dart';
 import 'addItem.dart';
 import 'editItem.dart';
@@ -17,19 +18,39 @@ class WardrobeCategoryPage extends StatefulWidget {
 }
 
 class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
-  late Box itemsBox;
+  Box? itemsBox; // Start with null
+  final HiveManager _hiveManager = HiveManager(); // Use the centralized service
   final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    itemsBox = Hive.box('itemsBox');
+    _loadBox();
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text;
       });
     });
+  }
+
+  Future<void> _loadBox() async {
+    try {
+      itemsBox = await _hiveManager.getBox(ITEMS_BOX_NAME);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading box: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -39,13 +60,30 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
   }
 
   List<Item> get filteredItems {
-    return itemsBox.values.cast<Item>().where((item) {
-      return item.category == widget.category && (
-          _searchText.isEmpty ||
-              item.name.toLowerCase().contains(_searchText.toLowerCase()) ||
-              item.description.toLowerCase().contains(_searchText.toLowerCase())
-      );
-    }).toList();
+    if (_isLoading || itemsBox == null) {
+      return [];
+    }
+
+    try {
+      final List<Item> items = [];
+
+      for (var value in itemsBox!.values) {
+        if (value is Item) {
+          final item = value;
+          if (item.category == widget.category &&
+              (_searchText.isEmpty ||
+                  item.name.toLowerCase().contains(_searchText.toLowerCase()) ||
+                  item.description.toLowerCase().contains(_searchText.toLowerCase()))) {
+            items.add(item);
+          }
+        }
+      }
+
+      return items;
+    } catch (e) {
+      print('Error filtering items: $e');
+      return [];
+    }
   }
 
   Future<void> _selectItem(Item selectedItem) async {
@@ -56,15 +94,24 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
       ),
     );
 
-    if (result == null) { // ✅ Item was deleted
-      setState(() {}); // ✅ Refresh UI immediately after deletion
+    if (result == null) { // Item was deleted
+      setState(() {}); // Refresh UI immediately after deletion
       return;
     }
 
     setState(() {
-      int index = itemsBox.values.toList().indexWhere((item) => item.id == selectedItem.id);
-      if (index != -1) {
-        itemsBox.putAt(index, result); // ✅ Update Hive with the edited item
+      try {
+        // Find the key for this item
+        final key = itemsBox?.keys.firstWhere(
+              (k) => itemsBox?.get(k) is Item && (itemsBox?.get(k) as Item).id == selectedItem.id,
+          orElse: () => null,
+        );
+
+        if (key != null) {
+          itemsBox?.put(key, result);
+        }
+      } catch (e) {
+        print('Error updating item: $e');
       }
     });
   }
@@ -115,9 +162,7 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
     );
 
     if (result != null) {
-      setState(() {
-        // Refresh the list when an item is added
-      });
+      setState(() {}); // Refresh the list
     }
   }
 
@@ -132,7 +177,9 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -206,7 +253,6 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-
                             ],
                           ),
                         ),

@@ -10,6 +10,7 @@ import 'package:drobe/models/item.dart';
 import 'package:drobe/services/outfitStorage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:drobe/services/hiveServiceManager.dart';
 
 
 class CreateOutfitPage extends StatefulWidget {
@@ -618,7 +619,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
   // Helper method to get items for a specific category
   Future<List<Item>> _getItemsForCategory(String category) async {
     try {
-      final itemsBox = await Hive.openBox('itemsBox');
+      final itemsBox = await HiveManager().getBox(ITEMS_BOX_NAME);
 
       // Handle singular/plural mismatches
       String categoryToMatch = category.toLowerCase();

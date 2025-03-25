@@ -10,6 +10,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:drobe/models/item.dart';
 import 'package:drobe/services/outfitStorage.dart';
 import 'package:drobe/models/outfit.dart';
+import 'package:drobe/services/hiveServiceManager.dart';
+import 'package:drobe/settings//settings.dart';
 
 
 void main() async {
@@ -19,8 +21,7 @@ void main() async {
   Hive.registerAdapter(ItemAdapter());
   Hive.registerAdapter(OutfitAdapter());
 
-
-  await Hive.openBox('itemsBox');
+  await HiveManager().init();
   await Hive.openBox<Outfit>('outfits');
   await OutfitStorageService.init();
 
@@ -467,7 +468,15 @@ class DraggableMenuScreen extends StatelessWidget {
                     MenuTile(
                       icon: Icons.settings,
                       label: "SETTINGS",
+                      onTap: () {
+                        Navigator.pop(context); // Close the menu
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SettingsPage()),
+                        );
+                      },
                     ),
+
                   ],
                 ),
               ),

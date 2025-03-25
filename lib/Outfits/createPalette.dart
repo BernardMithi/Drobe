@@ -9,6 +9,7 @@ import 'package:drobe/Outfits/outfits.dart';
 import 'package:drobe/models/item.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:drobe/services/hiveServiceManager.dart';
 
 class CreatePalettePage extends StatefulWidget {
   final DateTime selectedDate;
@@ -47,72 +48,157 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
     setState(() => _isLoading = true);
 
     try {
-      // Open the items box from Hive
-      final itemsBox = await Hive.openBox<Item>('itemsBox');
-      final items = itemsBox.values.toList();
+      // Get box reference without trying to re-open it
+      Box itemsBox;
 
-      print('Found ${items.length} items in wardrobe'); // Debug log item count
+      if (Hive.isBoxOpen('itemsBox')) {
+        print('Using existing open box');
+        itemsBox = Hive.box('itemsBox');
+      } else {
+        print('Opening box freshly');
+        itemsBox = await Hive.openBox('itemsBox');
+      }
 
-      // Map to track unique colors (using color value as key)
+      print('Box type: ${itemsBox.runtimeType}');
+      print('Box item count: ${itemsBox.length}');
+      print('Box keys: ${itemsBox.keys.toList()}');
+
+      // Debug the box contents more thoroughly
+      if (itemsBox.isEmpty) {
+        print('Box is empty. This might be the issue.');
+
+        // Check if items need to be added to the box
+        print('Have you added any items to your wardrobe yet?');
+        print('If yes, make sure they are being saved to "itemsBox"');
+      } else {
+        // Try to understand what's in the box
+        print('Box is not empty. Let\'s check what\'s inside:');
+        itemsBox.keys.forEach((key) {
+          final value = itemsBox.get(key);
+          print('Key: $key, Value type: ${value.runtimeType}');
+        });
+      }
+
+      // Get all items with proper type handling
+      List<Item> items = [];
+
+      for (var key in itemsBox.keys) {
+        try {
+          final item = itemsBox.get(key);
+          if (item != null && item is Item) {
+            items.add(item);
+            print('Added item: ${item.name}, Has colors: ${item.colors != null}');
+            if (item.colors != null) {
+              print('Colors: ${item.colors}');
+            }
+          } else if (item != null) {
+            print('Found non-Item at key $key: ${item.runtimeType}');
+            // Try to convert if it's a Map
+            if (item is Map) {
+              try {
+                // Attempt to create Item from Map
+                final convertedItem = Item(
+                  id: item['id'] as String? ?? 'unknown',
+                  imageUrl: item['imageUrl'] as String? ?? '',
+                  name: item['name'] as String? ?? 'Unknown Item',
+                  description: item['description'] as String? ?? '',
+                  colors: item['colors'] is List ? List<int>.from(item['colors']) : null,
+                  category: item['category'] as String? ?? 'uncategorized',
+                  wearCount: item['wearCount'] as int? ?? 0,
+                  inLaundry: item['inLaundry'] as bool? ?? false,
+                );
+                items.add(convertedItem);
+                print('Successfully converted map to Item: ${convertedItem.name}');
+              } catch (e) {
+                print('Failed to convert map to Item: $e');
+              }
+            }
+          }
+        } catch (e) {
+          print('Error getting item with key $key: $e');
+        }
+      }
+
+      print('Processed ${items.length} items from box');
+
+      // If we still have no items, it might be that:
+      // 1. No items have been added
+      // 2. Items are in a different box
+      // 3. The adapter is not correctly handling the data
+
+      if (items.isEmpty) {
+        // Check if any other box might contain our items
+        final boxNames = ['items', 'wardrobe', 'wardrobeItems', 'item'];
+        for (final name in boxNames) {
+          if (name != 'itemsBox' && Hive.isBoxOpen(name)) {
+            print('Checking box "$name"');
+            final altBox = Hive.box(name);
+            if (altBox.isNotEmpty) {
+              print('Found ${altBox.length} items in "$name" box');
+              // Could add logic to copy items if needed
+            }
+          }
+        }
+
+        // Let's add a test item to see if that works
+        print('Adding a test item with colors to the box');
+        final testItem = Item(
+          id: 'test-item-${DateTime.now().millisecondsSinceEpoch}',
+          imageUrl: 'https://example.com/test.jpg',
+          name: 'Test Item',
+          description: 'Test item with colors',
+          colors: [0xFF0000, 0x00FF00, 0x0000FF], // Red, Green, Blue
+          category: 'test',
+        );
+
+        await itemsBox.put(testItem.id, testItem);
+        print('Test item added. Box length now: ${itemsBox.length}');
+
+        // Add to our items list
+        items.add(testItem);
+      }
+
+      // Process colors
       final Map<int, ColorTile> colorMap = {};
 
       for (var item in items) {
-        print('Item: ${item.name}, Colors: ${item.colors}'); // Log each item and its colors
-
-        // Extract colors from item - more forgiving approach
-        if (item.colors != null) {
-          List<int> colorsList = [];
-
-          // Handle different potential formats of item.colors
-          if (item.colors is List<int>) {
-            colorsList = item.colors as List<int>;
-          } else if (item.colors is List<dynamic>) {
-            // Try to convert dynamic list to int list
-            colorsList = (item.colors as List<dynamic>)
-                .whereType<int>()
-                .toList();
-          }
-
-          print('Processed colors list: $colorsList'); // Log processed colors list
-
-          for (int colorValue in colorsList) {
-            // Ensure color value is valid (has alpha channel)
-            final adjustedColorValue = colorValue | 0xFF000000; // Ensure alpha is set
-
-            print('Adding color: 0x${adjustedColorValue.toRadixString(16)}'); // Log each color
-
-            // Add to our map if we haven't seen this color before
-            if (!colorMap.containsKey(adjustedColorValue)) {
+        if (item.colors != null && item.colors!.isNotEmpty) {
+          for (int colorValue in item.colors!) {
+            // Ensure color value has alpha
+            final colorWithAlpha = colorValue | 0xFF000000;
+            if (!colorMap.containsKey(colorWithAlpha)) {
               try {
-                final color = Color(adjustedColorValue);
-                colorMap[adjustedColorValue] = ColorTile(
-                    color: color,
+                colorMap[colorWithAlpha] = ColorTile(
+                    color: Color(colorWithAlpha),
                     itemName: item.name
                 );
+                print('Added color: 0x${colorWithAlpha.toRadixString(16)} from ${item.name}');
               } catch (e) {
-                print('Error creating color: $e');
+                print('Error creating color (${colorWithAlpha.toRadixString(16)}): $e');
               }
             }
           }
         }
       }
 
-      // Convert map values to our available colors list
       final uniqueColors = colorMap.values.toList();
-      print('Extracted ${uniqueColors.length} unique colors: $uniqueColors'); // Log unique colors
+      print('Found ${uniqueColors.length} unique colors');
 
-      setState(() {
-        _wardrobeColors = uniqueColors;
-        print('Set _wardrobeColors to ${_wardrobeColors.length} colors'); // Log after setting
+      if (mounted) {
+        setState(() {
+          _wardrobeColors = uniqueColors;
+          if (_wardrobeColors.isNotEmpty) {
+            _updatePaletteWithWardrobeColors();
+          }
+          _isLoading = false;
+        });
+      }
 
-        // Generate initial palette from wardrobe colors
-        _updatePaletteWithWardrobeColors();
-
-        _isLoading = false;
-      });
     } catch (e) {
-      print('Error loading wardrobe colors: $e');
-      setState(() => _isLoading = false);
+      print('Error in _loadWardrobeColors: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -245,69 +331,9 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                 ),
               ),
             ),
-
+            const SizedBox(height: 16),
             // Available wardrobe colors
-            if (_wardrobeColors.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "AVAILABLE COLORS IN YOUR WARDROBE",
-                      style: TextStyle(
-                        fontFamily: 'Avenir',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 40,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _wardrobeColors.length,
-                        itemBuilder: (context, index) {
-                          final colorTile = _wardrobeColors[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: GestureDetector(
-                              onTap: () {
-                                // When tapped, replace the first unlocked color in the palette
-                                for (int i = 0; i < _palette.length; i++) {
-                                  if (!_palette[i].isLocked) {
-                                    setState(() {
-                                      _palette[i] = ColorTile(
-                                          color: colorTile.color,
-                                          itemName: colorTile.itemName
-                                      );
-                                    });
-                                    break;
-                                  }
-                                }
-                              },
-                              child: Tooltip(
-                                message: colorTile.itemName ?? "Wardrobe color",
-                                child: Container(
-                                  width: 30,
-                                  height: 30,
-                                  decoration: BoxDecoration(
-                                    color: colorTile.color,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.black12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
+
 
             /// **Bottom Buttons**
             Padding(
@@ -392,7 +418,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
       index: i,
       child: Container(
         width: (MediaQuery.of(context).size.width - 48) / _paletteSize,
-        height: 320,
+        height: 240,
         decoration: BoxDecoration(
           color: tile.color,
           borderRadius: BorderRadius.circular(1),
@@ -422,21 +448,6 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
               },
             ),
 
-            // Show item source if available
-            if (tile.itemName != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  tile.itemName!,
-                  style: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
           ],
         ),
       ),
@@ -445,21 +456,18 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
   /// **Edit Color Method**
   Future<void> _editColor(int i) async {
-    TextEditingController colorController = TextEditingController();
-
     await showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        backgroundColor: Colors.grey[200],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.grey[100],
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              /// **Dialog Title**
               const Text(
-                "Enter HEX Color",
+                "Select a Color",
                 style: TextStyle(
                   fontFamily: 'Avenir',
                   fontSize: 18,
@@ -467,116 +475,40 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                   color: Colors.black87,
                 ),
               ),
-              const SizedBox(height: 12),
-
-              /// **HEX Input Field**
-              TextField(
-                controller: colorController,
-                style: const TextStyle(fontFamily: 'Avenir', color: Colors.black),
-                decoration: InputDecoration(
-                  hintText: "e.g., #A1A1A1",
-                  hintStyle: TextStyle(fontFamily: 'Avenir', color: Colors.grey[600]),
-                  filled: true,
-                  fillColor: Colors.grey[300],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(2),
-                    borderSide: BorderSide(color: Colors.grey[500]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey[700]!),
-                  ),
-                ),
-              ),
               const SizedBox(height: 16),
-
-              /// **Dialog Buttons**
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  /// **Cancel Button**
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.black87,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Cancel"),
-                  ),
-
-                  /// **Confirm Button**
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[900],
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {
-                      String hexColor = colorController.text.trim();
-
-                      // If it doesn't start with #, add it
-                      if (!hexColor.startsWith('#') && hexColor.length == 6) {
-                        hexColor = "#$hexColor";
-                      }
-
-                      // Convert hex to Color if valid
-                      Color? newColor;
-                      try {
-                        // Remove # and parse
-                        if (hexColor.startsWith('#') && hexColor.length == 7) {
-                          final hexValue = int.parse('FF${hexColor.substring(1)}', radix: 16);
-                          newColor = Color(hexValue);
-                        }
-                      } catch (e) {
-                        print('Invalid hex color: $e');
-                      }
-
-                      if (newColor != null) {
-                        // Check if this color exists in the wardrobe
-                        bool colorInWardrobe = false;
-                        for (var wardrobeColor in _wardrobeColors) {
-                          // Allow some flexibility in color matching
-                          // Check if the colors are similar enough
-                          if (_colorsAreSimilar(wardrobeColor.color, newColor)) {
-                            colorInWardrobe = true;
-                            break;
-                          }
-                        }
-
-                        if (!colorInWardrobe) {
-                          // Show warning but still allow using the color
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  "Warning: This color doesn't exist in your wardrobe. "
-                                      "You might not have matching items."
-                              ),
-                              duration: Duration(seconds: 3),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
-                        }
-
-                        // Update the color and close dialog
-                        setState(() {
-                          _palette[i] = ColorTile(
-                            color: newColor!,
-                            isLocked: _palette[i].isLocked,
-                            // Clear the item name since this is a custom color
-                            itemName: colorInWardrobe ? null : "Custom color",
-                          );
-                        });
-                        Navigator.pop(context);
-                      } else {
-                        // Show error for invalid hex
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Invalid HEX color format. Use format #RRGGBB."),
-                            backgroundColor: Colors.red,
-                          ),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _wardrobeColors.map((colorTile) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _palette[i] = ColorTile(
+                          color: colorTile.color,
+                          isLocked: _palette[i].isLocked,
+                          itemName: colorTile.itemName,
                         );
-                      }
+                      });
+                      Navigator.pop(context);
                     },
-                    child: const Text("OK"),
-                  ),
-                ],
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: colorTile.color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black12,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
               ),
             ],
           ),
@@ -635,9 +567,10 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
 Future<void> _checkItemsExistence() async {
   try {
-    final itemsBox = await Hive.openBox<Item>('items');
+    final itemsBox = await HiveManager().getBox(ITEMS_BOX_NAME);
     print('Items box exists: ${itemsBox != null}');
     print('Items count: ${itemsBox.length}');
+
 
     // List all keys in the box
     print('Item keys: ${itemsBox.keys.toList()}');
