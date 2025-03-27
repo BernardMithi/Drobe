@@ -323,7 +323,8 @@ class _OutfitsPageState extends State<OutfitsPage> {
                             width: 300,
                             child:
                             TextFormField(
-                              initialValue: outfitsForSelectedDate[_currentOutfitIndex].name ?? '',
+                              key: ValueKey('outfit-name-${outfitsForSelectedDate[_currentOutfitIndex].id}'),
+                              initialValue: outfitsForSelectedDate[_currentOutfitIndex].name,
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               textAlignVertical: TextAlignVertical.center,
                               decoration: const InputDecoration(
@@ -336,9 +337,15 @@ class _OutfitsPageState extends State<OutfitsPage> {
                                 final outfitId = outfitsForSelectedDate[_currentOutfitIndex].id;
                                 print('Changing outfit name from "$oldName" to "$newValue" (ID: $outfitId)');
 
+                                // Create a new outfit with the updated name
+                                final updatedOutfit = outfitsForSelectedDate[_currentOutfitIndex].copyWith(
+                                  name: newValue,
+                                );
+
                                 setState(() {
-                                  outfitsForSelectedDate[_currentOutfitIndex].name = newValue;
+                                  outfitsPerDay[normalizedDate]![_currentOutfitIndex] = updatedOutfit;
                                 });
+
                                 // Auto-save after a brief delay to avoid saving on every keystroke
                                 _debouncedSave(_currentOutfitIndex);
                               },
@@ -663,9 +670,20 @@ class _OutfitsPageState extends State<OutfitsPage> {
     );
 
     if (result != null) {
+      final normalizedDate = _normalizeDate(selectedDate);
+      final currentOutfit = outfitsPerDay[normalizedDate]![outfitIndex];
+
+      // Create a new map with the updated item
+      final updatedClothes = Map<String, String?>.from(currentOutfit.clothes);
+      updatedClothes[category] = result['item'].imageUrl as String?;
+
+      // Create a new outfit with the updated clothes
+      final updatedOutfit = currentOutfit.copyWith(
+        clothes: updatedClothes,
+      );
+
       setState(() {
-        final normalizedDate = _normalizeDate(selectedDate);
-        outfitsPerDay[normalizedDate]![outfitIndex].clothes[category] = result['item'].imageUrl as String?;
+        outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
       });
 
       // Save the updated outfit to Hive
@@ -682,19 +700,28 @@ class _OutfitsPageState extends State<OutfitsPage> {
     );
 
     if (result != null) {
-      setState(() {
-        final normalizedDate = _normalizeDate(selectedDate);
-        final item = result['item'];
-        String? newImageUrl = item.imageUrl;
+      final normalizedDate = _normalizeDate(selectedDate);
+      final currentOutfit = outfitsPerDay[normalizedDate]![outfitIndex];
+      final item = result['item'];
+      String? newImageUrl = item.imageUrl;
 
-        if (newImageUrl != null && newImageUrl.isNotEmpty) {
-          // Replace the accessory at the given index
-          outfitsPerDay[normalizedDate]![outfitIndex].accessories[accessoryIndex] = newImageUrl;
-        }
-      });
+      if (newImageUrl != null && newImageUrl.isNotEmpty) {
+        // Create a new list with the updated accessory
+        final updatedAccessories = List<String?>.from(currentOutfit.accessories);
+        updatedAccessories[accessoryIndex] = newImageUrl;
 
-      // Save the updated outfit to Hive
-      await _updateOutfit(outfitIndex);
+        // Create a new outfit with the updated accessories
+        final updatedOutfit = currentOutfit.copyWith(
+          accessories: updatedAccessories,
+        );
+
+        setState(() {
+          outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
+        });
+
+        // Save the updated outfit to Hive
+        await _updateOutfit(outfitIndex);
+      }
     }
   }
 
@@ -707,17 +734,27 @@ class _OutfitsPageState extends State<OutfitsPage> {
     );
 
     if (result != null) {
-      setState(() {
-        final normalizedDate = _normalizeDate(selectedDate);
-        String? newImageUrl = result['item'].imageUrl;
+      final normalizedDate = _normalizeDate(selectedDate);
+      final currentOutfit = outfitsPerDay[normalizedDate]![outfitIndex];
+      String? newImageUrl = result['item'].imageUrl;
 
-        if (newImageUrl != null && newImageUrl.isNotEmpty) {
-          outfitsPerDay[normalizedDate]![outfitIndex].accessories.add(newImageUrl);
-        }
-      });
+      if (newImageUrl != null && newImageUrl.isNotEmpty) {
+        // Create a new list with the added accessory
+        final updatedAccessories = List<String?>.from(currentOutfit.accessories);
+        updatedAccessories.add(newImageUrl);
 
-      // Save the updated outfit to Hive
-      await _updateOutfit(outfitIndex);
+        // Create a new outfit with the updated accessories
+        final updatedOutfit = currentOutfit.copyWith(
+          accessories: updatedAccessories,
+        );
+
+        setState(() {
+          outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
+        });
+
+        // Save the updated outfit to Hive
+        await _updateOutfit(outfitIndex);
+      }
     }
   }
 
@@ -734,9 +771,20 @@ class _OutfitsPageState extends State<OutfitsPage> {
           ),
           TextButton(
             onPressed: () async {
+              final normalizedDate = _normalizeDate(selectedDate);
+              final currentOutfit = outfitsPerDay[normalizedDate]![outfitIndex];
+
+              // Create a new list without the removed accessory
+              final updatedAccessories = List<String?>.from(currentOutfit.accessories);
+              updatedAccessories.removeAt(accessoryIndex);
+
+              // Create a new outfit with the updated accessories
+              final updatedOutfit = currentOutfit.copyWith(
+                accessories: updatedAccessories,
+              );
+
               setState(() {
-                final normalizedDate = _normalizeDate(selectedDate);
-                outfitsPerDay[normalizedDate]![outfitIndex].accessories.removeAt(accessoryIndex);
+                outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
               });
 
               // Save the updated outfit to Hive
@@ -764,9 +812,20 @@ class _OutfitsPageState extends State<OutfitsPage> {
           ),
           TextButton(
             onPressed: () async {
+              final normalizedDate = _normalizeDate(selectedDate);
+              final currentOutfit = outfitsPerDay[normalizedDate]![outfitIndex];
+
+              // Create a new map with the removed item
+              final updatedClothes = Map<String, String?>.from(currentOutfit.clothes);
+              updatedClothes[category] = null;
+
+              // Create a new outfit with the updated clothes
+              final updatedOutfit = currentOutfit.copyWith(
+                clothes: updatedClothes,
+              );
+
               setState(() {
-                final normalizedDate = _normalizeDate(selectedDate);
-                outfitsPerDay[normalizedDate]![outfitIndex].clothes[category] = null;
+                outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
               });
 
               // Save the updated outfit to Hive
@@ -816,20 +875,67 @@ class _OutfitsPageState extends State<OutfitsPage> {
     final normalizedDate = _normalizeDate(selectedDate);
     final outfit = outfitsPerDay[normalizedDate]![outfitIndex];
 
-    // Make sure we have a valid ID
-    if (outfit.id != null && outfit.id!.isNotEmpty) {
-      try {
-        await OutfitStorageService.updateOutfit(outfit);
-      } catch (e) {
-        print('Error updating outfit: $e');
-      }
-    } else {
-      // If outfit has no ID yet, save it as a new outfit
-      try {
+    print('BEFORE UPDATE - Outfit details:');
+    print('  ID: ${outfit.id}');
+    print('  Name: ${outfit.name}');
+
+    try {
+      // CRITICAL: Make sure we have a valid ID before updating
+      if (outfit.id == null || outfit.id!.isEmpty) {
+        // Generate a new ID if needed
+        final newId = const Uuid().v4();
+        print('Generated new ID: $newId for outfit with name: ${outfit.name}');
+
+        // Update the outfit with the new ID
+        final updatedOutfit = outfit.copyWith(id: newId);
+
+        // Update our local state
+        setState(() {
+          outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
+        });
+
+        // Save as a new outfit
+        await OutfitStorageService.saveOutfit(updatedOutfit);
+        print('Saved outfit with new ID: $newId, Name: ${updatedOutfit.name}');
+      } else {
+        // We have an ID, so update the existing outfit
+        print('Updating existing outfit - ID: ${outfit.id}, Name: ${outfit.name}');
+
+        // CRITICAL: First delete the existing outfit to avoid duplicates
+        await OutfitStorageService.deleteOutfit(outfit.id!);
+        print('Deleted existing outfit with ID: ${outfit.id} before update');
+
+        // Then save it again with the same ID
         await OutfitStorageService.saveOutfit(outfit);
-      } catch (e) {
-        print('Error saving new outfit: $e');
+        print('Re-saved outfit with ID: ${outfit.id}, Name: ${outfit.name}');
       }
+
+      // Verify the update worked by loading all outfits
+      final allOutfits = await OutfitStorageService.getAllOutfits();
+      print('After update, total outfits: ${allOutfits.length}');
+
+      // Check for duplicates
+      final names = <String>[];
+      final duplicates = <String>[];
+      for (final o in allOutfits) {
+        if (names.contains(o.name)) {
+          duplicates.add(o.name);
+        } else {
+          names.add(o.name);
+        }
+      }
+
+      if (duplicates.isNotEmpty) {
+        print('WARNING: Found duplicate outfit names: $duplicates');
+      } else {
+        print('No duplicate outfit names found.');
+      }
+
+    } catch (e) {
+      print('Error in _updateOutfit: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating outfit: $e')),
+      );
     }
   }
 
@@ -844,7 +950,6 @@ class _OutfitsPageState extends State<OutfitsPage> {
       _updateOutfit(outfitIndex);
     });
   }
-
 
   Future<void> _saveOutfit(Outfit outfit) async {
     try {

@@ -1,43 +1,41 @@
-// lib/models/outfit.dart
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
-part 'outfit.g.dart'; // This will be auto-generated
+part 'outfit.g.dart';
 
-@HiveType(typeId: 2) // Choose a unique type ID
-class Outfit {
+@HiveType(typeId: 1)
+class Outfit extends HiveObject {
   @HiveField(0)
-  String name;
-
-  @HiveField(1)
-  final DateTime date;
-
-  @HiveField(2)
-  final Map<String, String?> clothes;
-
-  @HiveField(3)
-  final List<String?> accessories;
-
-  @HiveField(4)
-  List<int> colorCodes; // We'll store colors as ints
-
-  @HiveField(5)
   String? id;
 
-  @HiveField(6)  // Ensure this is annotated
-  List<String> colorPaletteStrings = []; // Initialized with empty list
+  @HiveField(1)
+  String name;
 
-  // Getter that converts colorCodes back to Color objects
+  @HiveField(2)
+  final DateTime date;
+
+  @HiveField(3)
+  final Map<String, String?> clothes;
+
+  @HiveField(4)
+  final List<String?> accessories;
+
+  @HiveField(5)
+  List<int> colorCodes;
+
+  @HiveField(6)
+  List<String> colorPaletteStrings = [];
+
+  // Non-persisted field, computed from colorCodes
   List<Color> get colorPalette => colorCodes.map((code) => Color(code)).toList();
 
-
   Outfit({
+    this.id,
     required this.name,
     required this.clothes,
     required List<dynamic> accessories,
     required this.date,
-    List<Color>? colorPalette, // Make colorPalette optional
+    List<Color>? colorPalette,
     List<String>? colorPaletteStrings,
   }) :
         accessories = accessories
@@ -51,14 +49,35 @@ class Outfit {
     }
   }
 
+  // Create a copy of this outfit with optional new values
+  Outfit copyWith({
+    String? id,
+    String? name,
+    DateTime? date,
+    Map<String, String?>? clothes,
+    List<String?>? accessories,
+    List<Color>? colorPalette,
+    List<String>? colorPaletteStrings,
+  }) {
+    return Outfit(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      date: date ?? this.date,
+      clothes: clothes ?? Map<String, String?>.from(this.clothes),
+      accessories: accessories ?? List<String?>.from(this.accessories),
+      colorPalette: colorPalette ?? this.colorPalette,
+      colorPaletteStrings: colorPaletteStrings ?? List<String>.from(this.colorPaletteStrings),
+    );
+  }
 
   // Factory constructor
   factory Outfit.fromMap(Map<String, dynamic> map) {
     return Outfit(
+      id: map['id'] as String?,
       name: map['name'] as String,
       clothes: Map<String, String?>.from(map['clothes']),
       accessories: List<String?>.from(map['accessories']),
-      colorPalette: (map['colorCodes'] as List).map((code) => Color(code as int)).toList(),
+      colorPalette: (map['colorCodes'] as List?)?.map((code) => Color(code as int)).toList(),
       date: map['date'] is DateTime ? map['date'] : DateTime.parse(map['date'] as String),
     );
   }
@@ -66,6 +85,7 @@ class Outfit {
   // Convert to Map
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'name': name,
       'clothes': clothes,
       'accessories': accessories,
@@ -78,3 +98,4 @@ class Outfit {
     return name.isNotEmpty && clothes.values.any((url) => url != null && url.isNotEmpty);
   }
 }
+

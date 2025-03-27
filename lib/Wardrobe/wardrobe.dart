@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'wardrobeCategory.dart'; // Import the category page
+import 'wardrobeCategory.dart';
 
 class WardrobePage extends StatelessWidget {
   const WardrobePage({super.key});
