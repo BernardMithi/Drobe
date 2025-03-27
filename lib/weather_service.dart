@@ -43,9 +43,6 @@ class WeatherService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Debug print to check the weather data
-        print("Weather data: ${data['weather'][0]}");
-
         return {
           'temperature': "${data['main']['temp'].round()}°C",
           'description': data['weather'][0]['description'].toString().toUpperCase(),
@@ -69,7 +66,6 @@ class WeatherService {
 
   /// Get appropriate weather icon based on condition code
   IconData getWeatherIcon(int conditionCode) {
-    print("Getting icon for condition code: $conditionCode"); // Debug print
 
     if (conditionCode >= 200 && conditionCode < 300) {
       return Icons.flash_on; // Thunderstorm

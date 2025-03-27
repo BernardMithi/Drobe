@@ -901,13 +901,10 @@ class _OutfitsPageState extends State<OutfitsPage> {
         // We have an ID, so update the existing outfit
         print('Updating existing outfit - ID: ${outfit.id}, Name: ${outfit.name}');
 
-        // CRITICAL: First delete the existing outfit to avoid duplicates
-        await OutfitStorageService.deleteOutfit(outfit.id!);
-        print('Deleted existing outfit with ID: ${outfit.id} before update');
-
-        // Then save it again with the same ID
-        await OutfitStorageService.saveOutfit(outfit);
-        print('Re-saved outfit with ID: ${outfit.id}, Name: ${outfit.name}');
+        // SAFER: Use the updateOutfit method which handles the update properly
+        // instead of deleting and re-saving
+        await OutfitStorageService.updateOutfit(outfit);
+        print('Updated outfit with ID: ${outfit.id}, Name: ${outfit.name}');
       }
 
       // Verify the update worked by loading all outfits

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:flutter/foundation.dart';
 
 part 'outfit.g.dart';
 
@@ -47,6 +48,11 @@ class Outfit extends HiveObject {
     if (colorPaletteStrings != null) {
       this.colorPaletteStrings = colorPaletteStrings;
     }
+
+    // Ensure we have a valid name
+    if (name.isEmpty) {
+      name = 'Outfit ${DateTime.now().millisecondsSinceEpoch}';
+    }
   }
 
   // Create a copy of this outfit with optional new values
@@ -72,14 +78,27 @@ class Outfit extends HiveObject {
 
   // Factory constructor
   factory Outfit.fromMap(Map<String, dynamic> map) {
-    return Outfit(
-      id: map['id'] as String?,
-      name: map['name'] as String,
-      clothes: Map<String, String?>.from(map['clothes']),
-      accessories: List<String?>.from(map['accessories']),
-      colorPalette: (map['colorCodes'] as List?)?.map((code) => Color(code as int)).toList(),
-      date: map['date'] is DateTime ? map['date'] : DateTime.parse(map['date'] as String),
-    );
+    try {
+      return Outfit(
+        id: map['id'] as String?,
+        name: map['name'] as String? ?? 'Unnamed Outfit',
+        clothes: Map<String, String?>.from(map['clothes'] ?? {}),
+        accessories: List<String?>.from(map['accessories'] ?? []),
+        colorPalette: (map['colorCodes'] as List?)?.map((code) => Color(code as int)).toList(),
+        date: map['date'] is DateTime
+            ? map['date']
+            : DateTime.tryParse(map['date'] as String? ?? '') ?? DateTime.now(),
+      );
+    } catch (e) {
+      debugPrint('Error creating Outfit from map: $e');
+      // Return a fallback outfit
+      return Outfit(
+        name: 'Recovery Outfit',
+        clothes: {},
+        accessories: [],
+        date: DateTime.now(),
+      );
+    }
   }
 
   // Convert to Map
@@ -96,6 +115,11 @@ class Outfit extends HiveObject {
 
   bool isComplete() {
     return name.isNotEmpty && clothes.values.any((url) => url != null && url.isNotEmpty);
+  }
+
+  @override
+  String toString() {
+    return 'Outfit(id: $id, name: $name, date: $date)';
   }
 }
 
