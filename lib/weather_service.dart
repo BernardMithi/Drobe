@@ -1,31 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/material.dart';
 
 class WeatherService {
-  final String apiKey = "463022c9dca3ba42334800d4428170fb"; // Your API Key
-
-  /// Get the user's location and fetch weather data
-  Future<Map<String, String>> getWeather() async {
-    try {
-      final response = await http.get(Uri.parse('https://api.weatherapi.com/v1/current.json?key=YOUR_API_KEY&q=London'));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {
-          'temperature': "${data['current']['temp_c']}°C",
-          'description': data['current']['condition']['text']
-        };
-      } else {
-        return {'temperature': '--', 'description': 'Unavailable'};
-      }
-    } catch (e) {
-      return {'temperature': '--', 'description': 'Error fetching weather'};
-    }
-  }
+  final String apiKey = "463022c9dca3ba42334800d4428170fb";
 
   /// Get user's current location
-  Future<Position> _getLocation() async {
+  Future<Position> getLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
 
@@ -47,29 +29,85 @@ class WeatherService {
     }
 
     return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.bestForNavigation,
+      desiredAccuracy: LocationAccuracy.high,
     );
   }
 
-  /// Fetch weather data from OpenWeather API and format it
-  Future<String> _fetchWeather(double lat, double lon) async {
+  /// Fetch weather data from OpenWeather API
+  Future<Map<String, dynamic>> fetchWeather(double lat, double lon) async {
     final String url =
         "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric";
 
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final temperature = "${data['main']['temp'].toStringAsFixed(0)}°C";
-      final condition = _capitalize(data['weather'][0]['description']);
-      return "$temperature $condition"; // Example: "22°C Sunny"
-    } else {
-      throw Exception("Could not fetch weather.");
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'temperature': "${data['main']['temp'].round()}°C",
+          'description': data['weather'][0]['description'].toString().toUpperCase(),
+          'location': "${data['name']}, ${data['sys']['country']}",
+          'conditionCode': data['weather'][0]['id'],
+          'success': true
+        };
+      } else {
+        return {
+          'success': false,
+          'message': "Could not fetch weather. Status: ${response.statusCode}"
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': "Error fetching weather: $e"
+      };
     }
   }
 
-  /// Capitalize first letter of condition
-  String _capitalize(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1);
+  /// Get appropriate weather icon based on condition code
+  IconData getWeatherIcon(int conditionCode) {
+    if (conditionCode >= 200 && conditionCode < 300) {
+      return Icons.flash_on; // Thunderstorm
+    } else if (conditionCode >= 300 && conditionCode < 400) {
+      return Icons.grain; // Drizzle
+    } else if (conditionCode >= 500 && conditionCode < 600) {
+      return Icons.umbrella; // Rain
+    } else if (conditionCode >= 600 && conditionCode < 700) {
+      return Icons.ac_unit; // Snow
+    } else if (conditionCode >= 700 && conditionCode < 800) {
+      return Icons.blur_on; // Fog/Mist
+    } else if (conditionCode == 800) {
+      return Icons.wb_sunny; // Clear sky
+    } else if (conditionCode > 800 && conditionCode <= 804) {
+      return Icons.cloud; // Cloudy
+    } else {
+      return Icons.help_outline; // Unknown condition
+    }
+  }
+
+  /// Get greeting based on time of day
+  String getGreeting() {
+    final hour = DateTime.now().hour;
+
+    if (hour < 12) {
+      return "MORNING";
+    } else if (hour < 17) {
+      return "AFTERNOON";
+    } else {
+      return "EVENING";
+    }
+  }
+
+  /// Get sub-greeting message based on time of day
+  String getSubGreeting() {
+    final hour = DateTime.now().hour;
+
+    if (hour < 12) {
+      return "Let's get the day going";
+    } else if (hour < 17) {
+      return "Hope you're having a productive day";
+    } else {
+      return "Time to wind down and relax";
+    }
   }
 }
+

@@ -11,6 +11,7 @@ import 'package:path/path.dart' as path;
 import 'package:drobe/services/outfitStorage.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
+import 'package:drobe/settings/profile.dart';
 
 class OutfitsPage extends StatefulWidget {
   const OutfitsPage({Key? key}) : super(key: key);
@@ -110,8 +111,17 @@ class _OutfitsPageState extends State<OutfitsPage> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle, size: 40),
-            onPressed: () {},
+            icon:  Icon(
+              Icons.account_circle,
+              size: 42,
+              color: Colors.grey[800],
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ProfilePage()),
+              );
+            },
           ),
         ],
       ),

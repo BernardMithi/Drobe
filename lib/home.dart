@@ -1,4 +1,8 @@
+// main.dart
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
 import 'package:drobe/Wardrobe/wardrobe.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -11,16 +15,24 @@ import 'package:drobe/models/item.dart';
 import 'package:drobe/services/outfitStorage.dart';
 import 'package:drobe/models/outfit.dart';
 import 'package:drobe/services/hiveServiceManager.dart';
-import 'package:drobe/settings//settings.dart';
+import 'package:drobe/settings/settings.dart';
+import 'package:drobe/settings/profile.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'weather_service.dart';
 
+/// Global Route Observer
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Hive and register adapters
   await Hive.initFlutter();
   Hive.registerAdapter(ItemAdapter());
   Hive.registerAdapter(OutfitAdapter());
 
+  // Initialize Hive services and open boxes
   await HiveManager().init();
   await Hive.openBox<Outfit>('outfits');
   await OutfitStorageService.init();
@@ -41,11 +53,12 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Avenir',
       ),
       home: const Homepage(),
+      navigatorObservers: [routeObserver],
     );
   }
 }
 
-// Homepage
+// Homepage with RouteAware for refreshing on return
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
 
@@ -53,53 +66,76 @@ class Homepage extends StatefulWidget {
   State<Homepage> createState() => _HomepageState();
 }
 
-IconData weatherIcon = Icons.cloud_queue; // ✅ Define weatherIcon in Homepage
-
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    body: Stack(
-      children: [
-        Column(
-          children: [
-            const SizedBox(height: 200),
-            Icon(weatherIcon, size: 60, color: Colors.blue), // ✅ Use updated icon
-          ],
-        ),
-      ],
-    ),
-  );
-}
-
-class _HomepageState extends State<Homepage> {
-  final List<Map<String, String>> outfits = [
-    {
-      'image':
-      'https://i.pinimg.com/736x/0a/4d/47/0a4d4711c66e734444630bd8f0d192b1.jpg',
-      'description': 'T-shirt with Shorts and Sneakers',
-    },
-    {
-      'image':
-      'https://i.pinimg.com/736x/6d/8c/a4/6d8ca407235fb57945617dcdb669a53b.jpg',
-      'description': 'Formal Shirt with Trousers and Shoes',
-    },
-    {
-      'image':
-      'https://i.pinimg.com/736x/82/d3/3f/82d33fe9eed4c101d6a53d0fd16adc38.jpg',
-      'description': 'Hoodie with Joggers and Running Shoes',
-    },
-  ];
-
+class _HomepageState extends State<Homepage> with RouteAware {
   int currentIndex = 0;
+  List<Outfit> todayOutfits = [];
+  bool isLoading = true;
+  final WeatherService weatherService = WeatherService();
+  String greeting = "HI";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodaysOutfits();
+    _updateGreeting();
+  }
+
+  void _updateGreeting() {
+    setState(() {
+      greeting = weatherService.getGreeting();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)! as PageRoute);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Refresh when returning to this page.
+    _loadTodaysOutfits();
+    _updateGreeting();
+    super.didPopNext();
+  }
+
+  Future<void> _loadTodaysOutfits() async {
+    try {
+      final allOutfits = await OutfitStorageService.getAllOutfits();
+      final today = DateTime.now();
+      final normalizedToday = DateTime(today.year, today.month, today.day);
+
+      setState(() {
+        todayOutfits = allOutfits.where((outfit) {
+          final outfitDate = DateTime(
+            outfit.date.year,
+            outfit.date.month,
+            outfit.date.day,
+          );
+          return outfitDate.isAtSameMomentAs(normalizedToday);
+        }).toList();
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading outfits: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   void _showMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      isScrollControlled: true, // Enables full-screen dragging
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(2)),
-      ),
       builder: (context) => const DraggableMenuScreen(),
     );
   }
@@ -107,7 +143,7 @@ class _HomepageState extends State<Homepage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true, // Allows AppBar to overlap the body
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -117,7 +153,7 @@ class _HomepageState extends State<Homepage> {
           // Greeting Header with darker overlay
           Container(
             width: double.infinity,
-            height: 200,
+            height: 160,
             padding: const EdgeInsets.only(top: 50),
             decoration: BoxDecoration(
               image: DecorationImage(
@@ -132,42 +168,50 @@ class _HomepageState extends State<Homepage> {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 15.0),
               child: Row(
-                // Place greeting text on the left & account icon on the right
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Greeting text
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'HI BERNARD,',
-                        style: TextStyle(
-                          fontFamily: 'Avenir',
-                          fontSize: 24,
-                          color: Colors.white,
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$greeting BERNARD,',
+                          style: const TextStyle(
+                            fontFamily: 'Avenir',
+                            fontSize: 24,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Let\'s get the day going',
-                        style: TextStyle(
-                          fontFamily: 'Avenir',
-                          fontSize: 16,
-                          color: Colors.white,
+                        const SizedBox(height: 10),
+                        Text(
+                          weatherService.getSubGreeting(),
+                          style: const TextStyle(
+                            fontFamily: 'Avenir',
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-
-                  // Account icon
-                  Icon(
-                    Icons.account_circle,
-                    size: 42,
-                    color: Colors.white,
+                  IconButton(
+                    icon: const Icon(
+                      Icons.account_circle,
+                      size: 42,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ProfilePage()),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -177,12 +221,12 @@ class _HomepageState extends State<Homepage> {
           // Main content
           Column(
             children: [
-              const SizedBox(height: 200), // Space for the greeting header
-              const WeatherWidget(),
+              const SizedBox(height: 160),
+              const ImprovedWeatherWidget(),
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
+                  horizontal: 15.0,
+                  vertical: 2.0,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -191,14 +235,14 @@ class _HomepageState extends State<Homepage> {
                       "TODAY'S OUTFITS",
                       style: TextStyle(
                         fontFamily: 'Avenir',
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
                     ),
-                    if (outfits.isNotEmpty)
+                    if (todayOutfits.isNotEmpty)
                       Text(
-                        '${currentIndex + 1} / ${outfits.length}',
+                        '${currentIndex + 1} / ${todayOutfits.length}',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -209,8 +253,12 @@ class _HomepageState extends State<Homepage> {
                 ),
               ),
               Expanded(
-                child: HorizontalOutfitList(
-                  outfits: outfits,
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : todayOutfits.isEmpty
+                    ? _buildNoOutfitsWidget()
+                    : HorizontalOutfitList(
+                  outfits: todayOutfits,
                   onPageChanged: (index) {
                     setState(() {
                       currentIndex = index;
@@ -237,82 +285,90 @@ class _HomepageState extends State<Homepage> {
       ),
     );
   }
+
+  Widget _buildNoOutfitsWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.checkroom, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 14),
+          Text(
+            'NO OUTFITS FOR TODAY',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => OutfitsPage()),
+              );
+            },
+            child: const Text('Create an Outfit'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// Weather Widget
-class WeatherWidget extends StatefulWidget {
-  const WeatherWidget({super.key});
+// Improved Weather Widget
+class ImprovedWeatherWidget extends StatefulWidget {
+  const ImprovedWeatherWidget({super.key});
 
   @override
-  State<WeatherWidget> createState() => _WeatherWidgetState();
+  State<ImprovedWeatherWidget> createState() => _ImprovedWeatherWidgetState();
 }
 
-class _WeatherWidgetState extends State<WeatherWidget> {
+class _ImprovedWeatherWidgetState extends State<ImprovedWeatherWidget> {
   String temperature = "Loading...";
   String weatherDescription = "Fetching weather...";
   String location = "Fetching...";
-  String apiKey = "463022c9dca3ba42334800d4428170fb";
-
+  IconData weatherIcon = Icons.cloud_queue;
+  final WeatherService weatherService = WeatherService();
 
   @override
   void initState() {
     super.initState();
-    _determinePosition();
+    _loadWeatherData();
   }
 
-  /// **Get User's Current Location**
-  Future<void> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      setState(() => weatherDescription = "GPS is disabled.");
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        setState(() => weatherDescription = "Location permission denied.");
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      setState(() => weatherDescription = "Permission denied forever.");
-      return;
-    }
-
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-    fetchWeather(position.latitude, position.longitude);
-  }
-
-  /// **Fetch Weather Data Based on Location**
-  Future<void> fetchWeather(double lat, double lon) async {
-    final String url =
-        "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric";
-
+  Future<void> _loadWeatherData() async {
     try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      // Get location
+      final position = await weatherService.getLocation();
+
+      // Fetch weather data
+      final weatherData = await weatherService.fetchWeather(
+          position.latitude,
+          position.longitude
+      );
+
+      if (weatherData['success'] == true) {
         setState(() {
-          temperature = "${data['main']['temp']}°C";
-          weatherDescription =
-              data['weather'][0]['description'].toString().toUpperCase();
-          location = "${data['name']}, ${data['sys']['country']}";
+          temperature = weatherData['temperature'];
+          weatherDescription = weatherData['description'];
+          location = weatherData['location'];
+          weatherIcon = weatherService.getWeatherIcon(weatherData['conditionCode']);
         });
       } else {
-        setState(() => weatherDescription = "Could not fetch weather");
+        setState(() {
+          weatherDescription = weatherData['message'];
+          weatherIcon = Icons.error_outline;
+        });
       }
     } catch (e) {
-      setState(() => weatherDescription = "Error fetching weather");
+      setState(() {
+        weatherDescription = "Error: $e";
+        weatherIcon = Icons.error_outline;
+      });
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -321,10 +377,10 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     return Padding(
       padding: const EdgeInsets.all(10.0),
       child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
-        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        elevation: 3,
         child: Padding(
-          padding: const EdgeInsets.all(25.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -332,7 +388,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(weatherIcon, size: 48, color: Colors.orangeAccent),
+                  Icon(weatherIcon, size: 48, color: Colors.deepOrange),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -401,14 +457,14 @@ class DraggableMenuScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.77, // Start high
-      minChildSize: 0.3,     // Minimum height
-      maxChildSize: 0.77,     // Full height
+      initialChildSize: 0.77,
+      minChildSize: 0.3,
+      maxChildSize: 0.77,
       builder: (context, scrollController) {
         return Container(
-          decoration:  BoxDecoration(
+          decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.9),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(2)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.max,
@@ -426,12 +482,12 @@ class DraggableMenuScreen extends StatelessWidget {
                 child: ListView(
                   controller: scrollController,
                   padding: EdgeInsets.zero,
-                  children:  [
+                  children: [
                     MenuTile(
                       icon: Icons.checkroom,
                       label: "OUTFITS",
                       onTap: () {
-                        Navigator.pop(context); // Close the menu
+                        Navigator.pop(context);
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => OutfitsPage()),
@@ -442,7 +498,7 @@ class DraggableMenuScreen extends StatelessWidget {
                       icon: Icons.inventory,
                       label: "MY WARDROBE",
                       onTap: () {
-                        Navigator.pop(context); // Close the menu
+                        Navigator.pop(context);
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => WardrobePage()),
@@ -464,19 +520,25 @@ class DraggableMenuScreen extends StatelessWidget {
                     MenuTile(
                       icon: Icons.account_circle,
                       label: "ACCOUNT",
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ProfilePage()),
+                        );
+                      },
                     ),
                     MenuTile(
                       icon: Icons.settings,
                       label: "SETTINGS",
                       onTap: () {
-                        Navigator.pop(context); // Close the menu
+                        Navigator.pop(context);
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => const SettingsPage()),
                         );
                       },
                     ),
-
                   ],
                 ),
               ),
@@ -488,13 +550,13 @@ class DraggableMenuScreen extends StatelessWidget {
   }
 }
 
-// MenuTile
+// MenuTile Widget
 class MenuTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
 
-  MenuTile({
+  const MenuTile({
     super.key,
     required this.icon,
     required this.label,
@@ -514,11 +576,7 @@ class MenuTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-                icon,
-                size: 28,
-                color: Colors.grey[800]
-            ),
+            Icon(icon, size: 28, color: Colors.grey[800]),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -538,7 +596,7 @@ class MenuTile extends StatelessWidget {
   }
 }
 
-// ArrowIcon
+// ArrowIcon Widget
 class ArrowIcon extends StatelessWidget {
   final VoidCallback onTap;
   final IconData icon;
@@ -565,7 +623,7 @@ class ArrowIcon extends StatelessWidget {
 
 // Horizontal Outfit List
 class HorizontalOutfitList extends StatelessWidget {
-  final List<Map<String, String>> outfits;
+  final List<Outfit> outfits;
   final ValueChanged<int> onPageChanged;
 
   const HorizontalOutfitList({
@@ -579,18 +637,27 @@ class HorizontalOutfitList extends StatelessWidget {
     final double cardWidth = MediaQuery.of(context).size.width - 32;
 
     return Padding(
-      padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 80.0),
+      padding: const EdgeInsets.only(left: 12.0, right: 12.0, bottom: 60.0),
       child: PageView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: outfits.length,
         onPageChanged: onPageChanged,
         itemBuilder: (context, index) {
           final outfit = outfits[index];
+
+          // Get a main image from the outfit
+          String? mainImageUrl = outfit.clothes['SHIRT'] ??
+              outfit.clothes.values.firstWhere(
+                    (url) => url != null && url.isNotEmpty,
+                orElse: () => null,
+              );
+
           return SizedBox(
             width: cardWidth,
             child: OutfitCard(
-              imageUrl: outfit['image']!,
-              description: outfit['description']!,
+              imageUrl: mainImageUrl ?? '/placeholder.svg',
+              description: outfit.name,
+              outfit: outfit,
             ),
           );
         },
@@ -603,46 +670,296 @@ class HorizontalOutfitList extends StatelessWidget {
 class OutfitCard extends StatelessWidget {
   final String imageUrl;
   final String description;
+  final Outfit outfit;
 
   const OutfitCard({
     required this.imageUrl,
     required this.description,
+    required this.outfit,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
       elevation: 2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
-              child: Image.network(
-                imageUrl,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+            flex: 3,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => OutfitsPage(),
+                  ),
+                );
+              },
+              child: _buildClothingGrid(),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              description,
-              style: const TextStyle(
-                fontFamily: 'Avenir',
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+
+          // Accessories section
+          if (_hasAccessories())
+            Container(
+              height: 120, // Increased height to accommodate the wheel
+              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 5.0),
+              child: Center(
+                child: _buildAccessoriesRow(),
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
         ],
       ),
     );
   }
+
+  bool _hasAccessories() {
+    return outfit.accessories.any((accessory) => accessory != null && accessory.isNotEmpty);
+  }
+
+  Widget _buildClothingGrid() {
+    final List<MapEntry<String, String?>> validClothes = outfit.clothes.entries
+        .where((entry) => entry.value != null && entry.value!.isNotEmpty)
+        .toList();
+
+    if (validClothes.isEmpty) {
+      return _buildPlaceholderImage();
+    }
+
+    return GridView.count(
+      crossAxisCount: 2,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      physics: const NeverScrollableScrollPhysics(), // Make grid non-scrollable
+      shrinkWrap: true, // Ensure grid takes only the space it needs
+      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+      children: validClothes.map((entry) {
+        return _buildClothingItem(entry.key, entry.value!);
+      }).toList(),
+    );
+  }
+
+  Widget _buildAccessoriesRow() {
+    final List<String> validAccessories = outfit.accessories
+        .where((accessory) => accessory != null && accessory.isNotEmpty)
+        .cast<String>() // Cast to non-nullable String after filtering out nulls
+        .toList();
+
+    if (validAccessories.isEmpty) {
+      return const Center(
+        child: Text(
+          'No accessories',
+          style: TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+      );
+    }
+
+    // Calculate the middle index to start from
+    final int initialIndex = validAccessories.length ~/ 2;
+
+    return Column(
+      children: [
+        // Accessories scroll view
+        Expanded(
+          child: RotatedBox(
+            quarterTurns: 3, // Rotate to make the wheel vertical
+            child: ListWheelScrollView.useDelegate(
+              itemExtent: 80,
+              diameterRatio: 1.8,
+              offAxisFraction: -0.5, // Offset to the left
+              squeeze: 0.8,
+              physics: const FixedExtentScrollPhysics(),
+              controller: FixedExtentScrollController(initialItem: initialIndex),
+              childDelegate: ListWheelChildBuilderDelegate(
+                childCount: validAccessories.length,
+                builder: (context, index) {
+                  return RotatedBox(
+                    quarterTurns: 1, // Rotate items back to normal
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: _buildImageWidget(validAccessories[index], 'Accessory'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+
+        // Scroll indicator
+        Container(
+          height: 15,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.arrow_left, size: 14, color: Colors.grey[400]),
+              Text(
+                'SCROLL FOR MORE',
+                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+              ),
+              Icon(Icons.arrow_right, size: 14, color: Colors.grey[400]),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClothingItem(String category, String imagePath) {
+    return Container(
+      margin: const EdgeInsets.only(left: 4, right: 4, bottom: 4), // Removed top margin
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _buildImageWidget(imagePath, category),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccessoryItem(String imagePath) {
+    return Container(
+      width: 70,
+      height: 70,
+      margin: const EdgeInsets.only(right: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: _buildImageWidget(imagePath, 'Accessory'),
+      ),
+    );
+  }
+
+  Widget _buildImageWidget(String imagePath, String type) {
+    return FutureBuilder<String>(
+      future: getAbsoluteImagePath(imagePath),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+        } else if (snapshot.hasError || !snapshot.hasData) {
+          return _buildItemPlaceholder(type);
+        } else {
+          final absolutePath = snapshot.data!;
+          final file = File(absolutePath);
+
+          if (file.existsSync()) {
+            return Image.file(
+              file,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return _buildItemPlaceholder(type);
+              },
+            );
+          } else {
+            return _buildItemPlaceholder(type);
+          }
+        }
+      },
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      color: Colors.grey[200],
+      child: const Center(
+        child: Icon(
+          Icons.checkroom,
+          size: 48,
+          color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemPlaceholder(String type) {
+    IconData icon;
+    Color iconColor;
+
+    // Choose appropriate icon and color based on item type
+    if (type.toLowerCase().contains('shirt') ||
+        type.toLowerCase().contains('top') ||
+        type.toLowerCase().contains('tee')) {
+      icon = Icons.dry_cleaning;
+      iconColor = Colors.blue[300]!;
+    } else if (type.toLowerCase().contains('pant') ||
+        type.toLowerCase().contains('trouser') ||
+        type.toLowerCase().contains('short') ||
+        type.toLowerCase().contains('bottom')) {
+      icon = Icons.layers;
+      iconColor = Colors.brown[300]!;
+    } else if (type.toLowerCase().contains('shoe') ||
+        type.toLowerCase().contains('sneaker') ||
+        type.toLowerCase().contains('boot')) {
+      icon = Icons.snowshoeing;
+      iconColor = Colors.black54;
+    } else if (type.toLowerCase().contains('accessory')) {
+      icon = Icons.watch;
+      iconColor = Colors.amber[700]!;
+    } else if (type.toLowerCase().contains('layer') ||
+        type.toLowerCase().contains('jacket') ||
+        type.toLowerCase().contains('coat')) {
+      icon = Icons.layers_outlined;
+      iconColor = Colors.green[700]!;
+    } else {
+      icon = Icons.checkroom;
+      iconColor = Colors.grey[600]!;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 36,
+              color: iconColor,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              type,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+/// Helper function to convert stored relative paths to absolute paths.
+Future<String> getAbsoluteImagePath(String storedPath) async {
+  final directory = await getApplicationDocumentsDirectory();
+  if (storedPath.contains('/Documents/')) {
+    const docsKeyword = '/Documents/';
+    final index = storedPath.indexOf(docsKeyword);
+    final relativePath = storedPath.substring(index + docsKeyword.length);
+    return path.join(directory.path, relativePath);
+  } else {
+    return path.join(directory.path, storedPath);
+  }
+}
+

@@ -11,6 +11,7 @@ class ItemSelectionPage extends StatefulWidget {
   final bool fromCreateOutfit;
   final bool autoSelect;
   final bool preloadOnly;
+  final List<Color>? colorPalette; // Added color palette parameter
 
   const ItemSelectionPage({
     Key? key,
@@ -18,6 +19,7 @@ class ItemSelectionPage extends StatefulWidget {
     this.fromCreateOutfit = false,
     this.autoSelect = false,
     this.preloadOnly = false,
+    this.colorPalette, // New parameter for color palette
   }) : super(key: key);
 
   @override
@@ -29,6 +31,7 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
   bool _hasHandledInitialNavigation = false;
+  bool _filterByColorPalette = true; // Default to filtering by color palette
 
   @override
   void initState() {
@@ -98,8 +101,98 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
     super.dispose();
   }
 
+  // Simplified color distance calculation that's more reliable
+  double _calculateColorDistance(Color color1, Color color2) {
+    // Calculate Euclidean distance in RGB space
+    final dr = (color1.red - color2.red).abs();
+    final dg = (color1.green - color2.green).abs();
+    final db = (color1.blue - color2.blue).abs();
+
+    // Calculate weighted distance (human eye is more sensitive to green)
+    return math.sqrt(0.299 * dr * dr + 0.587 * dg * dg + 0.114 * db * db);
+  }
+
+  // IMPROVED: Check if an item's colors match the color palette with better thresholds
+  bool _itemMatchesColorPalette(Item item) {
+    // If no color palette is provided or item has no colors, return true
+    if (widget.colorPalette == null || widget.colorPalette!.isEmpty ||
+        item.colors == null || item.colors!.isEmpty) {
+      return true;
+    }
+
+    // Special case for white shoes - they match with any palette
+    if (widget.slot?.toLowerCase() == "shoes" && _isWhiteOrOffWhite(item)) {
+      return true;
+    }
+
+    // For each color in the item, find the closest palette color
+    double bestScore = double.infinity;
+
+    for (final colorInt in item.colors!) {
+      final itemColor = Color(colorInt | 0xFF000000); // Ensure alpha is set
+
+      for (final paletteColor in widget.colorPalette!) {
+        final score = _calculateColorDistance(itemColor, paletteColor);
+        if (score < bestScore) {
+          bestScore = score;
+        }
+      }
+    }
+
+    // Apply appropriate thresholds based on item category
+    // Lower thresholds = stricter matching
+    double threshold;
+    String? slotLower = widget.slot?.toLowerCase();
+
+    if (slotLower == "accessories") {
+      threshold = 100.0; // More lenient for accessories
+    } else if (slotLower == "shoes") {
+      threshold = 80.0; // Slightly more strict for shoes
+    } else {
+      threshold = 60.0; // Strictest for main clothing items
+    }
+
+    return bestScore <= threshold;
+  }
+
+  // Check if an item is white or off-white (for shoes special case)
+  bool _isWhiteOrOffWhite(Item item) {
+    if (item.colors == null || item.colors!.isEmpty) return false;
+
+    for (final colorInt in item.colors!) {
+      final color = Color(colorInt | 0xFF000000);
+
+      // Check if the color is white or off-white
+      if (_isWhiteColor(color)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // IMPROVED: Helper to determine if a color is white or off-white with better detection
+  bool _isWhiteColor(Color color) {
+    // Convert to HSV for better white detection
+    final HSVColor hsv = HSVColor.fromColor(color);
+
+    // White has very low saturation and high value
+    final bool isLowSaturation = hsv.saturation < 0.15;
+    final bool isHighValue = hsv.value > 0.85;
+
+    // Also check RGB values are all high and close to each other
+    final int avgRgb = (color.red + color.green + color.blue) ~/ 3;
+    final bool isHighBrightness = avgRgb > 220;
+    final bool isBalanced =
+        (color.red - avgRgb).abs() < 15 &&
+            (color.green - avgRgb).abs() < 15 &&
+            (color.blue - avgRgb).abs() < 15;
+
+    return isLowSaturation && isHighValue && isHighBrightness && isBalanced;
+  }
+
   List<Item> get filteredItems {
-    return itemsBox.values.cast<Item>().where((item) {
+    final List<Item> items = itemsBox.values.cast<Item>().where((item) {
       // Check if slot is null first
       if (widget.slot == null) {
         // No slot specified, show all items
@@ -145,8 +238,54 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
           item.name.toLowerCase().contains(_searchText.toLowerCase()) ||
           item.description.toLowerCase().contains(_searchText.toLowerCase());
 
-      return matchesSlot && matchesSearch;
+      // Check if we need to filter by color palette
+      final bool matchesColorPalette = !_filterByColorPalette || _itemMatchesColorPalette(item);
+
+      return matchesSlot && matchesSearch && matchesColorPalette;
     }).toList();
+
+    // If color palette filtering is enabled, sort items by color similarity
+    if (_filterByColorPalette && widget.colorPalette != null && widget.colorPalette!.isNotEmpty) {
+      items.sort((a, b) {
+        // If one item has colors and the other doesn't, prioritize the one with colors
+        if ((a.colors == null || a.colors!.isEmpty) && (b.colors != null && b.colors!.isNotEmpty)) {
+          return 1;
+        }
+        if ((a.colors != null && a.colors!.isNotEmpty) && (b.colors == null || b.colors!.isEmpty)) {
+          return -1;
+        }
+
+        // If neither has colors, maintain original order
+        if ((a.colors == null || a.colors!.isEmpty) && (b.colors == null || b.colors!.isEmpty)) {
+          return 0;
+        }
+
+        // Calculate best match score for each item
+        double bestScoreA = double.infinity;
+        double bestScoreB = double.infinity;
+
+        for (final colorInt in a.colors!) {
+          final itemColor = Color(colorInt | 0xFF000000);
+          for (final paletteColor in widget.colorPalette!) {
+            final score = _calculateColorDistance(itemColor, paletteColor);
+            if (score < bestScoreA) bestScoreA = score;
+          }
+        }
+
+        for (final colorInt in b.colors!) {
+          final itemColor = Color(colorInt | 0xFF000000);
+          for (final paletteColor in widget.colorPalette!) {
+            final score = _calculateColorDistance(itemColor, paletteColor);
+            if (score < bestScoreB) bestScoreB = score;
+          }
+        }
+
+        // Sort by best match score (lower is better)
+        return bestScoreA.compareTo(bestScoreB);
+      });
+    }
+
+    return items;
   }
 
   Future<String> _getImageAbsolutePath(String imagePath) async {
@@ -189,12 +328,13 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
   @override
   Widget build(BuildContext context) {
     final items = filteredItems;
+    final bool hasPalette = widget.colorPalette != null && widget.colorPalette!.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           (widget.slot ?? "").toUpperCase() + " ITEMS",
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18), // ✅ Correct usage
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -207,6 +347,7 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
       ),
       body: Column(
         children: [
+          // Search field
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -217,17 +358,113 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                // Removed background
                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
             ),
           ),
+
+          // Color palette filter controls - centered and compact
+          if (hasPalette)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Color palette display (more compact)
+                  Container(
+                    height: 24,
+                    width: MediaQuery.of(context).size.width * 0.8, // 80% of screen width
+                    margin: const EdgeInsets.only(bottom: 8.0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: Row(
+                      children: widget.colorPalette!.map((color) {
+                        return Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: color,
+                              border: Border.all(color: Colors.black12, width: 0.5),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
+                  // Compact filter toggle with label
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "Filter by palette",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Transform.scale(
+                        scale: 0.8, // Make switch smaller
+                        child: Switch(
+                          value: _filterByColorPalette,
+                          onChanged: (value) {
+                            setState(() {
+                              _filterByColorPalette = value;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+          // Filter status indicator
+          if (hasPalette && _filterByColorPalette)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                "Showing ${items.length} matching items",
+                style: TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+
+          // Items grid
           Expanded(
             child: items.isEmpty
                 ? Center(
-              child: Text(
-                'No items found',
-                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.palette_outlined,
+                    size: 48,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No matching items found',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                  if (hasPalette && _filterByColorPalette)
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _filterByColorPalette = false;
+                          });
+                        },
+                        child: const Text("Show all items"),
+                      ),
+                    ),
+                ],
               ),
             )
                 : GridView.builder(
@@ -315,3 +552,4 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
     );
   }
 }
+

@@ -10,6 +10,7 @@ import 'package:drobe/models/item.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:drobe/services/hiveServiceManager.dart';
+import 'package:drobe/settings/profile.dart';
 
 class CreatePalettePage extends StatefulWidget {
   final DateTime selectedDate;
@@ -231,8 +232,17 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle, size: 30),
-            onPressed: () {},
+            icon:  Icon(
+              Icons.account_circle,
+              size: 42,
+              color: Colors.grey[800],
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ProfilePage()),
+              );
+            },
           ),
         ],
       ),
@@ -413,6 +423,10 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   Widget _buildColorTileWidget(int i, {Key? key}) {
     final tile = _palette[i];
 
+    // Determine if the background color is light or dark
+    final brightness = ThemeData.estimateBrightnessForColor(tile.color);
+    final iconColor = brightness == Brightness.light ? Colors.black : Colors.grey[300];
+
     return ReorderableDragStartListener(
       key: key!,
       index: i,
@@ -428,18 +442,18 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
           children: [
             /// **Edit Button (Top)**
             IconButton(
-              icon: const Icon(Icons.edit, color: Colors.black),
+              icon: Icon(Icons.edit, color: iconColor),
               onPressed: () => _editColor(i),
             ),
 
             /// **Drag Handle (Below Edit Button)**
-            const Icon(Icons.drag_indicator, color: Colors.black, size: 28),
+            Icon(Icons.drag_indicator, color: iconColor, size: 28),
 
             /// **Lock/Unlock Button**
             IconButton(
               icon: Icon(
                 tile.isLocked ? Icons.lock : Icons.lock_open,
-                color: Colors.black,
+                color: iconColor,
               ),
               onPressed: () {
                 setState(() {
@@ -594,3 +608,4 @@ class ColorTile {
 
   ColorTile({required this.color, this.isLocked = false, this.itemName});
 }
+

@@ -11,6 +11,7 @@ import 'package:drobe/services/outfitStorage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:drobe/services/hiveServiceManager.dart';
+import 'package:drobe/settings/profile.dart';
 
 
 class CreateOutfitPage extends StatefulWidget {
@@ -49,6 +50,18 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
   // List for accessories
   List<String?> chosenAccessories = [];
 
+  // Track previously selected items to ensure variety
+  final Map<String, Set<String>> _previouslySelectedItems = {
+    'LAYER': {},
+    'SHIRT': {},
+    'BOTTOMS': {},
+    'SHOES': {},
+    'ACCESSORIES': {},
+  };
+
+  // Track currently selected accessory IDs to prevent duplicates in the same outfit
+  final Set<String> _currentOutfitAccessoryIds = {};
+
   // Determine if the "Save" FAB is enabled
   bool get canSave {
     final hasName = _outfitNameController.text.trim().isNotEmpty;
@@ -79,8 +92,17 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle, size: 40),
-            onPressed: () {},
+            icon:  Icon(
+              Icons.account_circle,
+              size: 42,
+              color: Colors.grey[800],
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ProfilePage()),
+              );
+            },
           ),
         ],
       ),
@@ -526,9 +548,18 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
     );
 
     try {
-      // Process each clothing category
-      for (final category in chosenClothes.keys) {
-        bool success = await _ensureItemSelected(category);
+      // Clear the current outfit accessory IDs when generating a new outfit
+      _currentOutfitAccessoryIds.clear();
+
+      // Track which palette colors are used to ensure variety
+      final usedPaletteColors = <Color>{};
+
+      // Process each clothing category in a specific order to ensure coordination
+      // Start with main items (shirt, bottoms) then add layers and shoes
+      final orderedCategories = ['SHIRT', 'BOTTOMS', 'LAYER', 'SHOES'];
+
+      for (final category in orderedCategories) {
+        bool success = await _ensureItemSelected(category, usedPaletteColors);
         if (success) {
           print('Item selected for $category: ${chosenClothes[category]}');
         } else {
@@ -542,10 +573,10 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
       });
 
       final random = math.Random();
-      final accessoryCount = random.nextInt(3); // 0-2 accessories
+      final accessoryCount = random.nextInt(3) + 1; // 1-3 accessories for more variety
 
       for (int i = 0; i < accessoryCount; i++) {
-        await _selectRandomAccessory();
+        await _selectRandomAccessory(usedPaletteColors);
         await Future.delayed(const Duration(milliseconds: 200));
       }
     } catch (e) {
@@ -565,7 +596,8 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
     }
   }
 
-  Future<bool> _ensureItemSelected(String category) async {
+// Enhanced method to select items based on color matching
+  Future<bool> _ensureItemSelected(String category, [Set<Color>? usedPaletteColors]) async {
     for (int attempt = 0; attempt < 3; attempt++) {
       try {
         final items = await _getItemsForCategory(category);
@@ -575,45 +607,365 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
           return false;
         }
 
-        final random = math.Random();
-        final selectedItem = items[random.nextInt(items.length)];
-        final selectedImageUrl = selectedItem.imageUrl;
+        // Get items sorted by color similarity to the palette
+        final sortedItems = _sortItemsByColorSimilarity(items, category);
 
-        if (selectedImageUrl == null || selectedImageUrl.isEmpty) {
-          print('Selected item has no valid image URL');
-          continue;
-        }
+        if (sortedItems.isEmpty) {
+          print('No suitable items found for $category after color matching with strict thresholds');
 
-        print('About to update state for $category with URL: $selectedImageUrl');
+          // Try again with more lenient thresholds as a fallback
+          final lenientSortedItems = _getLenientColorMatches(items, category);
 
-        // Get absolute path if needed
-        String finalPath;
-        if (selectedImageUrl.startsWith('http') || selectedImageUrl.startsWith('/')) {
-          finalPath = selectedImageUrl;
-        } else {
-          finalPath = await getAbsoluteImagePath(selectedImageUrl);
-        }
-
-        // Verify file exists for local paths
-        if (!selectedImageUrl.startsWith('http')) {
-          final file = File(finalPath);
-          final exists = await file.exists();
-          if (!exists) {
-            print('File does not exist at path: $finalPath');
-            continue;
+          if (lenientSortedItems.isNotEmpty) {
+            print('Found ${lenientSortedItems.length} items with lenient color matching');
+            final selectedItem = _selectItemWithVariety(lenientSortedItems, category);
+            return await _selectAndSetItem(selectedItem, category);
           }
+
+          // If still no matches, fall back to random selection
+          print('Falling back to random selection');
+          final random = math.Random();
+          final randomItem = items[random.nextInt(items.length)];
+          return await _selectAndSetItem(randomItem, category);
         }
 
-        setState(() {
-          chosenClothes[category] = finalPath;
-        });
-        return true;
+        // Select an item with weighted randomness to ensure variety
+        final selectedItem = _selectItemWithVariety(sortedItems, category);
+        return await _selectAndSetItem(selectedItem, category);
       } catch (e) {
         print('Error selecting item for $category (attempt ${attempt + 1}): $e');
         await Future.delayed(const Duration(milliseconds: 300));
       }
     }
     return false;
+  }
+
+// Helper method to select and set an item
+  Future<bool> _selectAndSetItem(Item item, String category) async {
+    final selectedImageUrl = item.imageUrl;
+
+    if (selectedImageUrl == null || selectedImageUrl.isEmpty) {
+      print('Selected item has no valid image URL');
+      return false;
+    }
+
+    print('About to update state for $category with URL: $selectedImageUrl');
+
+    // Get absolute path if needed
+    String finalPath;
+    if (selectedImageUrl.startsWith('http') || selectedImageUrl.startsWith('/')) {
+      finalPath = selectedImageUrl;
+    } else {
+      finalPath = await getAbsoluteImagePath(selectedImageUrl);
+    }
+
+    // Verify file exists for local paths
+    if (!selectedImageUrl.startsWith('http')) {
+      final file = File(finalPath);
+      final exists = await file.exists();
+      if (!exists) {
+        print('File does not exist at path: $finalPath');
+        return false;
+      }
+    }
+
+    // Add to previously selected items to track variety
+    _previouslySelectedItems[category]!.add(item.id);
+
+    // Limit the history size to prevent it from growing too large
+    if (_previouslySelectedItems[category]!.length > 10) {
+      _previouslySelectedItems[category] =
+          _previouslySelectedItems[category]!.skip(_previouslySelectedItems[category]!.length - 10).toSet();
+    }
+
+    setState(() {
+      chosenClothes[category] = finalPath;
+    });
+    return true;
+  }
+
+// Select an item with weighted randomness to ensure variety
+  Item _selectItemWithVariety(List<Item> sortedItems, String category) {
+    // If we have few items, just use the best match
+    if (sortedItems.length <= 2) {
+      return sortedItems.first;
+    }
+
+    // Create a weighted list favoring items not recently used
+    final weightedItems = <Item>[];
+    final recentlyUsedIds = _previouslySelectedItems[category]!;
+
+    // Take the top items for consideration, but use a dynamic percentage based on category
+    // This allows more variety for accessories and shoes, less for main clothing
+    double percentageToConsider;
+    if (category == 'ACCESSORIES') {
+      percentageToConsider = 0.7; // Consider 70% of matches for accessories
+    } else if (category == 'SHOES') {
+      percentageToConsider = 0.6; // Consider 60% of matches for shoes
+    } else {
+      percentageToConsider = 0.5; // Consider 50% of matches for main clothing
+    }
+
+    final candidateCount = math.max(3, (sortedItems.length * percentageToConsider).ceil());
+    final candidates = sortedItems.take(candidateCount).toList();
+
+    // Shuffle the candidates slightly to introduce more randomness while preserving general order
+    if (candidates.length > 3) {
+      // Keep the top 3 items in order, shuffle the rest
+      final topItems = candidates.take(3).toList();
+      final restItems = candidates.skip(3).toList();
+      restItems.shuffle();
+      candidates.clear();
+      candidates.addAll(topItems);
+      candidates.addAll(restItems);
+    }
+
+    for (final item in candidates) {
+      // Add items multiple times based on their priority
+      // Items not recently used get added more times (higher chance of selection)
+      int weight = recentlyUsedIds.contains(item.id) ? 1 : 3;
+
+      // Give higher weight to top matches, but with diminishing returns
+      final index = candidates.indexOf(item);
+      if (index < 3) {
+        weight += (3 - index);
+      } else if (index < 6) {
+        weight += 1; // Small boost for items in positions 3-5
+      }
+
+      // Add a small random factor to increase variety
+      weight += math.Random().nextInt(2);
+
+      for (int i = 0; i < weight; i++) {
+        weightedItems.add(item);
+      }
+    }
+
+    // Select randomly from the weighted list
+    final random = math.Random();
+    return weightedItems[random.nextInt(weightedItems.length)];
+  }
+
+// Enhanced method to sort items by color similarity
+  List<Item> _sortItemsByColorSimilarity(List<Item> items, String category) {
+    // Filter items that have colors defined
+    final itemsWithColors = items.where((item) =>
+    item.colors != null && item.colors!.isNotEmpty).toList();
+
+    if (itemsWithColors.isEmpty) {
+      print('No items with defined colors found for $category');
+      return [];
+    }
+
+    // Create a map to store items with their best color match score
+    final Map<Item, double> itemScores = {};
+
+    // Track which palette color was the best match for each item
+    final Map<Item, Color> bestMatchingPaletteColor = {};
+
+    // Count how many items match each palette color to ensure variety
+    final Map<Color, int> paletteColorUsageCount = {};
+    for (final color in widget.colorPalette) {
+      paletteColorUsageCount[color] = 0;
+    }
+
+    for (final item in itemsWithColors) {
+      // Special case for white shoes - they match with any palette
+      if (category == 'SHOES' && _isWhiteOrOffWhite(item)) {
+        itemScores[item] = 0.0; // Perfect score for white shoes
+        // Assign a random palette color to avoid skewing the distribution
+        bestMatchingPaletteColor[item] = widget.colorPalette[
+        math.Random().nextInt(widget.colorPalette.length)
+        ];
+        continue;
+      }
+
+      double bestScore = double.infinity;
+      Color? bestColor;
+
+      // For each color in the item, find the closest palette color
+      for (final colorInt in item.colors!) {
+        final itemColor = Color(colorInt | 0xFF000000); // Ensure alpha is set
+
+        for (final paletteColor in widget.colorPalette) {
+          final score = _calculateEnhancedColorDistance(itemColor, paletteColor);
+          if (score < bestScore) {
+            bestScore = score;
+            bestColor = paletteColor;
+          }
+        }
+      }
+
+      // Apply a threshold to determine if the color is "close enough"
+      // The threshold is more lenient for accessories and shoes to allow for more variety
+      double threshold;
+      if (category == 'ACCESSORIES') {
+        threshold = 90.0; // Reduced from 120.0 to be more selective
+      } else if (category == 'SHOES') {
+        threshold = 80.0; // Reduced from 100.0 to be more selective
+      } else {
+        threshold = 15.0; // Reduced from 70.0 for even stricter matching on main clothing
+      }
+
+      if (bestScore <= threshold && bestColor != null) {
+        itemScores[item] = bestScore;
+        bestMatchingPaletteColor[item] = bestColor;
+        paletteColorUsageCount[bestColor] = (paletteColorUsageCount[bestColor] ?? 0) + 1;
+      }
+    }
+
+    // Sort items by their best match score (lower is better)
+    final sortedItems = itemScores.keys.toList();
+
+    // Apply a balanced sorting that considers both color match quality and color variety
+    sortedItems.sort((a, b) {
+      // Get the best matching palette color for each item
+      final colorA = bestMatchingPaletteColor[a];
+      final colorB = bestMatchingPaletteColor[b];
+
+      // If they match different palette colors, prioritize the less used color
+      if (colorA != colorB && colorA != null && colorB != null) {
+        final countA = paletteColorUsageCount[colorA] ?? 0;
+        final countB = paletteColorUsageCount[colorB] ?? 0;
+
+        // If one color is significantly more used than the other, prioritize the less used one
+        if ((countA - countB).abs() > 1) {
+          return countA.compareTo(countB);
+        }
+      }
+
+      // Otherwise, sort by color match score
+      return itemScores[a]!.compareTo(itemScores[b]!);
+    });
+
+    // Print some debug info
+    if (sortedItems.isNotEmpty) {
+      print('Found ${sortedItems.length} matching items for $category');
+      print('Best matching item: ${sortedItems.first.name} with score: ${itemScores[sortedItems.first]}');
+    }
+
+    return sortedItems;
+  }
+
+// Check if an item is white or off-white (for shoes special case)
+  bool _isWhiteOrOffWhite(Item item) {
+    if (item.colors == null || item.colors!.isEmpty) return false;
+
+    for (final colorInt in item.colors!) {
+      final color = Color(colorInt | 0xFF000000);
+
+      // Check if the color is white or off-white
+      // White/off-white has high RGB values and low saturation
+      if (_isWhiteColor(color)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+// Helper to determine if a color is white or off-white
+  bool _isWhiteColor(Color color) {
+    // Convert to HSV for better white detection
+    final double max = math.max(color.red, math.max(color.green, color.blue)) / 255.0;
+    final double min = math.min(color.red, math.min(color.green, color.blue)) / 255.0;
+
+    // Calculate saturation: difference between max and min values
+    final double saturation = max > 0 ? (max - min) / max : 0;
+
+    // White has high brightness and low saturation
+    final bool isHighBrightness = (color.red + color.green + color.blue) / 3 > 220;
+    final bool isLowSaturation = saturation < 0.15;
+
+    return isHighBrightness && isLowSaturation;
+  }
+
+// Enhanced color distance calculation using HSV color space
+  double _calculateEnhancedColorDistance(Color color1, Color color2) {
+    // Convert RGB to HSV components for better perceptual comparison
+    final HSVColor hsv1 = HSVColor.fromColor(color1);
+    final HSVColor hsv2 = HSVColor.fromColor(color2);
+
+    // Calculate hue distance (considering the circular nature of hue)
+    double hueDiff = (hsv1.hue - hsv2.hue).abs();
+    if (hueDiff > 180) hueDiff = 360 - hueDiff;
+
+    // Normalize hue difference to 0-1 range
+    hueDiff /= 180.0;
+
+    // Calculate saturation and value differences
+    final double satDiff = (hsv1.saturation - hsv2.saturation).abs();
+    final double valDiff = (hsv1.value - hsv2.value).abs();
+
+    // Apply stricter non-linear scaling to hue differences
+    // Colors with even slightly different hues should be penalized more
+    double scaledHueDiff = hueDiff;
+    if (hueDiff > 0.10) { // Reduced from 0.15 to be more sensitive to hue differences
+      // Apply stronger exponential scaling for hue differences
+      scaledHueDiff = 0.10 + (hueDiff - 0.10) * (hueDiff - 0.10) * 3.0; // Increased multiplier from 2.5 to 3.0
+    }
+
+    // Weight the components with increased emphasis on hue and saturation
+    final double weightedDiff = (scaledHueDiff * 0.75) + (satDiff * 0.20) + (valDiff * 0.05);
+
+    // Scale to a more intuitive range (0-100)
+    return weightedDiff * 100;
+  }
+
+// Add a new method to get color matches with more lenient thresholds as a fallback
+  List<Item> _getLenientColorMatches(List<Item> items, String category) {
+    // Filter items that have colors defined
+    final itemsWithColors = items.where((item) =>
+    item.colors != null && item.colors!.isNotEmpty).toList();
+
+    if (itemsWithColors.isEmpty) {
+      return [];
+    }
+
+    // Create a map to store items with their best color match score
+    final Map<Item, double> itemScores = {};
+
+    for (final item in itemsWithColors) {
+      // Special case for white shoes - they match with any palette
+      if (category == 'SHOES' && _isWhiteOrOffWhite(item)) {
+        itemScores[item] = 0.0; // Perfect score for white shoes
+        continue;
+      }
+
+      double bestScore = double.infinity;
+
+      // For each color in the item, find the closest palette color
+      for (final colorInt in item.colors!) {
+        final itemColor = Color(colorInt | 0xFF000000); // Ensure alpha is set
+
+        for (final paletteColor in widget.colorPalette) {
+          final score = _calculateEnhancedColorDistance(itemColor, paletteColor);
+          if (score < bestScore) {
+            bestScore = score;
+          }
+        }
+      }
+
+      // Apply more lenient thresholds for fallback matches
+      double threshold;
+      if (category == 'ACCESSORIES') {
+        threshold = 130.0; // More lenient than primary threshold
+      } else if (category == 'SHOES') {
+        threshold = 110.0; // More lenient than primary threshold
+      } else {
+        threshold = 15.0; // More lenient than primary threshold
+      }
+
+      if (bestScore <= threshold) {
+        itemScores[item] = bestScore;
+      }
+    }
+
+    // Sort items by their best match score (lower is better)
+    final sortedItems = itemScores.keys.toList()
+      ..sort((a, b) => itemScores[a]!.compareTo(itemScores[b]!));
+
+    return sortedItems;
   }
 
   // Helper method to get items for a specific category
@@ -648,8 +1000,8 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
     }
   }
 
-  // Helper method to select a random accessory
-  Future<void> _selectRandomAccessory() async {
+  // Enhanced method to select a random accessory with color matching
+  Future<void> _selectRandomAccessory([Set<Color>? usedPaletteColors]) async {
     try {
       // Create a set of already selected accessory URLs to check for duplicates
       final selectedAccessoryUrls = chosenAccessories
@@ -661,38 +1013,93 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
 
       if (accessories.isEmpty) return;
 
-      // Keep trying until we find a non-duplicate or hit a reasonable limit
-      int attempts = 0;
-      bool foundNewAccessory = false;
+      // Filter out accessories that are already in the current outfit
+      final availableAccessories = accessories.where((item) =>
+      !_currentOutfitAccessoryIds.contains(item.id)).toList();
 
-      while (!foundNewAccessory && attempts < 5) {
-        attempts++;
+      if (availableAccessories.isEmpty) {
+        print('No more unique accessories available');
+        return;
+      }
 
-        // Select a random accessory
-        final random = math.Random();
-        final selectedItem = accessories[random.nextInt(accessories.length)];
-        final newAccessoryUrl = selectedItem.imageUrl;
+      // Sort accessories by color similarity to the palette
+      final sortedAccessories = _sortItemsByColorSimilarity(availableAccessories, 'ACCESSORIES');
 
-        // Check if this accessory is already selected
-        if (newAccessoryUrl != null && newAccessoryUrl.isNotEmpty &&
-            !selectedAccessoryUrls.contains(newAccessoryUrl)) {
-          foundNewAccessory = true;
+      // If no color matches found, use random selection
+      if (sortedAccessories.isEmpty) {
+        _selectRandomAccessoryFromList(availableAccessories, selectedAccessoryUrls);
+        return;
+      }
 
-          // Get absolute path if needed
-          String finalPath;
-          if (newAccessoryUrl.startsWith('http') || newAccessoryUrl.startsWith('/')) {
-            finalPath = newAccessoryUrl;
-          } else {
-            finalPath = await getAbsoluteImagePath(newAccessoryUrl);
-          }
+      // Select an accessory with weighted randomness to ensure variety
+      final selectedItem = _selectItemWithVariety(sortedAccessories, 'ACCESSORIES');
+      final newAccessoryUrl = selectedItem.imageUrl;
 
-          setState(() {
-            chosenAccessories.add(finalPath);
-          });
+      if (newAccessoryUrl != null && newAccessoryUrl.isNotEmpty &&
+          !selectedAccessoryUrls.contains(newAccessoryUrl)) {
+
+        // Get absolute path if needed
+        String finalPath;
+        if (newAccessoryUrl.startsWith('http') || newAccessoryUrl.startsWith('/')) {
+          finalPath = newAccessoryUrl;
+        } else {
+          finalPath = await getAbsoluteImagePath(newAccessoryUrl);
         }
+
+        // Add to previously selected items to track variety
+        _previouslySelectedItems['ACCESSORIES']!.add(selectedItem.id);
+
+        // Add to current outfit accessory IDs to prevent duplicates
+        _currentOutfitAccessoryIds.add(selectedItem.id);
+
+        setState(() {
+          chosenAccessories.add(finalPath);
+        });
+      } else {
+        // If the selected item is already in the accessories or has no valid URL, try another one
+        _selectRandomAccessoryFromList(availableAccessories, selectedAccessoryUrls);
       }
     } catch (e) {
       print('Error selecting random accessory: $e');
+    }
+  }
+
+  // Helper method to select a random accessory from a list
+  void _selectRandomAccessoryFromList(List<Item> accessories, Set<String> selectedAccessoryUrls) async {
+    int attempts = 0;
+    bool foundNewAccessory = false;
+
+    while (!foundNewAccessory && attempts < 5) {
+      attempts++;
+
+      // Select a random accessory
+      final random = math.Random();
+      final selectedItem = accessories[random.nextInt(accessories.length)];
+      final newAccessoryUrl = selectedItem.imageUrl;
+
+      // Check if this accessory is already selected
+      if (newAccessoryUrl != null && newAccessoryUrl.isNotEmpty &&
+          !selectedAccessoryUrls.contains(newAccessoryUrl)) {
+        foundNewAccessory = true;
+
+        // Get absolute path if needed
+        String finalPath;
+        if (newAccessoryUrl.startsWith('http') || newAccessoryUrl.startsWith('/')) {
+          finalPath = newAccessoryUrl;
+        } else {
+          finalPath = await getAbsoluteImagePath(newAccessoryUrl);
+        }
+
+        // Add to previously selected items to track variety
+        _previouslySelectedItems['ACCESSORIES']!.add(selectedItem.id);
+
+        // Add to current outfit accessory IDs to prevent duplicates
+        _currentOutfitAccessoryIds.add(selectedItem.id);
+
+        setState(() {
+          chosenAccessories.add(finalPath);
+        });
+      }
     }
   }
 
@@ -704,6 +1111,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         builder: (context) => ItemSelectionPage(
           slot: category,  // This will be used to filter items by category
           fromCreateOutfit: true,
+          colorPalette: widget.colorPalette, // Pass the color palette
         ),
       ),
     );
@@ -726,6 +1134,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         builder: (context) => ItemSelectionPage(
           slot: 'Accessories', // This filters items to show only accessories
           fromCreateOutfit: true,
+          colorPalette: widget.colorPalette, // Pass the color palette
         ),
       ),
     );
@@ -733,15 +1142,19 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
     if (result != null && result is Map && result.containsKey('item')) {
       final item = result['item'];
       if (item != null && item.imageUrl != null) {
-        setState(() {
-          if (replaceIndex != null && replaceIndex < chosenAccessories.length) {
-            // Replace existing accessory
+        // If replacing an existing accessory, remove the old one from tracking
+        if (replaceIndex != null && replaceIndex < chosenAccessories.length) {
+          // We don't have the ID of the old accessory, so we can't remove it from _currentOutfitAccessoryIds
+
+          setState(() {
             chosenAccessories[replaceIndex] = item.imageUrl;
-          } else {
-            // Add new accessory
+          });
+        } else {
+          // Add new accessory
+          setState(() {
             chosenAccessories.add(item.imageUrl);
-          }
-        });
+          });
+        }
       }
     }
   }
@@ -885,3 +1298,4 @@ class ColorTile {
   final Color color;
   ColorTile({required this.color});
 }
+
