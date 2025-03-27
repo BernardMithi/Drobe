@@ -1,8 +1,6 @@
-// main.dart
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-
 import 'package:drobe/Wardrobe/wardrobe.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -21,7 +19,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'weather_service.dart';
 
-/// Global Route Observer
+
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 Future<void> main() async {
@@ -140,6 +138,13 @@ class _HomepageState extends State<Homepage> with RouteAware {
     );
   }
 
+  void _navigateToProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProfilePage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -147,6 +152,20 @@ class _HomepageState extends State<Homepage> with RouteAware {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          // Add the profile button to the app bar instead
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              icon: const Icon(
+                Icons.account_circle,
+                size: 42,
+                color: Colors.white,
+              ),
+              onPressed: _navigateToProfile,
+            ),
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -169,49 +188,28 @@ class _HomepageState extends State<Homepage> with RouteAware {
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$greeting BERNARD,',
-                          style: const TextStyle(
-                            fontFamily: 'Avenir',
-                            fontSize: 24,
-                            color: Colors.white,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          weatherService.getSubGreeting(),
-                          style: const TextStyle(
-                            fontFamily: 'Avenir',
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.account_circle,
-                      size: 42,
+                  Text(
+                    '$greeting BERNARD,',
+                    style: const TextStyle(
+                      fontFamily: 'Avenir',
+                      fontSize: 24,
                       color: Colors.white,
                     ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ProfilePage()),
-                      );
-                    },
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    weatherService.getSubGreeting(),
+                    style: const TextStyle(
+                      fontFamily: 'Avenir',
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ),
@@ -287,31 +285,72 @@ class _HomepageState extends State<Homepage> with RouteAware {
   }
 
   Widget _buildNoOutfitsWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.checkroom, size: 64, color: Colors.grey[300]),
-          const SizedBox(height: 14),
-          Text(
-            'NO OUTFITS FOR TODAY',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
+    final double cardWidth = MediaQuery.of(context).size.width - 20;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 2.0, right: 2.0, bottom: 60.0),
+      child: SizedBox(
+        width: cardWidth,
+        child: Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+          elevation: 2,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 1),
+                // Styled "No outfits" text
+                Text(
+                  'NO OUTFITS FOR TODAY',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Subtle description text
+                Text(
+                  'Create your first outfit for today',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                  ),
+                ),
+                const SizedBox(height: 30),
+                // Styled button with gray background
+                Container(
+                  child: Material(
+                    clipBehavior: Clip.antiAlias,
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(100),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => OutfitsPage()),
+                        );
+                      },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              size: 50,
+                              Icons.add_circle_outline,
+                              color: Colors.black54,
+                            ),
+                          ],
+                        ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => OutfitsPage()),
-              );
-            },
-            child: const Text('Create an Outfit'),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -331,6 +370,7 @@ class _ImprovedWeatherWidgetState extends State<ImprovedWeatherWidget> {
   String location = "Fetching...";
   IconData weatherIcon = Icons.cloud_queue;
   final WeatherService weatherService = WeatherService();
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -340,6 +380,10 @@ class _ImprovedWeatherWidgetState extends State<ImprovedWeatherWidget> {
 
   Future<void> _loadWeatherData() async {
     try {
+      setState(() {
+        isLoading = true;
+      });
+
       // Get location
       final position = await weatherService.getLocation();
 
@@ -354,18 +398,26 @@ class _ImprovedWeatherWidgetState extends State<ImprovedWeatherWidget> {
           temperature = weatherData['temperature'];
           weatherDescription = weatherData['description'];
           location = weatherData['location'];
-          weatherIcon = weatherService.getWeatherIcon(weatherData['conditionCode']);
+
+          // Make sure we're getting a valid condition code
+          final int conditionCode = weatherData['conditionCode'];
+
+          // Get the appropriate icon
+          weatherIcon = weatherService.getWeatherIcon(conditionCode);
+          isLoading = false;
         });
       } else {
         setState(() {
           weatherDescription = weatherData['message'];
           weatherIcon = Icons.error_outline;
+          isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
         weatherDescription = "Error: $e";
         weatherIcon = Icons.error_outline;
+        isLoading = false;
       });
     }
   }
@@ -381,7 +433,9 @@ class _ImprovedWeatherWidgetState extends State<ImprovedWeatherWidget> {
         elevation: 3,
         child: Padding(
           padding: const EdgeInsets.all(20.0),
-          child: Column(
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Weather Info
@@ -601,7 +655,11 @@ class ArrowIcon extends StatelessWidget {
   final VoidCallback onTap;
   final IconData icon;
 
-  const ArrowIcon({required this.onTap, required this.icon, super.key});
+  const ArrowIcon({
+    super.key,
+    required this.onTap,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -627,9 +685,9 @@ class HorizontalOutfitList extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
 
   const HorizontalOutfitList({
+    super.key,
     required this.outfits,
     required this.onPageChanged,
-    super.key,
   });
 
   @override
@@ -673,16 +731,16 @@ class OutfitCard extends StatelessWidget {
   final Outfit outfit;
 
   const OutfitCard({
+    super.key,
     required this.imageUrl,
     required this.description,
     required this.outfit,
-    super.key,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
       elevation: 2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -783,7 +841,7 @@ class OutfitCard extends StatelessWidget {
                       height: 70,
                       margin: const EdgeInsets.symmetric(horizontal: 6),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(4),
                         child: _buildImageWidget(validAccessories[index], 'Accessory'),
                       ),
                     ),
@@ -816,7 +874,7 @@ class OutfitCard extends StatelessWidget {
 
   Widget _buildClothingItem(String category, String imagePath) {
     return Container(
-      margin: const EdgeInsets.only(left: 4, right: 4, bottom: 4), // Removed top margin
+      margin: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: Stack(
