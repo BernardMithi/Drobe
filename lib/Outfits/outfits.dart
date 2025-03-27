@@ -320,40 +320,38 @@ class _OutfitsPageState extends State<OutfitsPage> {
                       children: [
                         _isEditing
                             ? SizedBox(
-                          width: 300,
-                          child: // Replace the TextFormField in the _buildClothingItem method with this improved version:
-                          TextFormField(
-                            initialValue: outfitsForSelectedDate[_currentOutfitIndex].name ?? '',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            textAlignVertical: TextAlignVertical.center,
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 6),
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (newValue) {
-                              setState(() {
-                                outfitsForSelectedDate[_currentOutfitIndex].name = newValue;
-                              });
-                              // Auto-save after a brief delay to avoid saving on every keystroke
-                              _debouncedSave(_currentOutfitIndex);
-                            },
-                            onEditingComplete: () {
-                              // Still save when Enter is pressed
-                              _updateOutfit(_currentOutfitIndex);
-                              // Remove focus from the text field
-                              FocusScope.of(context).unfocus();
-                            },
-                            // Add onTap to ensure the text field behaves predictably
-                            onTap: () {
-                              // Optional: You could select all text when tapping
-                              // controller.selection = TextSelection(baseOffset: 0, extentOffset: controller.text.length);
-                            },
-                            // Add this to save when the field loses focus
-                            onFieldSubmitted: (_) {
-                              _updateOutfit(_currentOutfitIndex);
-                            },
-                          )
+                            width: 300,
+                            child:
+                            TextFormField(
+                              initialValue: outfitsForSelectedDate[_currentOutfitIndex].name ?? '',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              textAlignVertical: TextAlignVertical.center,
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 6),
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (newValue) {
+                                final oldName = outfitsForSelectedDate[_currentOutfitIndex].name;
+                                final outfitId = outfitsForSelectedDate[_currentOutfitIndex].id;
+                                print('Changing outfit name from "$oldName" to "$newValue" (ID: $outfitId)');
+
+                                setState(() {
+                                  outfitsForSelectedDate[_currentOutfitIndex].name = newValue;
+                                });
+                                // Auto-save after a brief delay to avoid saving on every keystroke
+                                _debouncedSave(_currentOutfitIndex);
+                              },
+                              onEditingComplete: () {
+                                // Still save when Enter is pressed
+                                _updateOutfit(_currentOutfitIndex);
+                                // Remove focus from the text field
+                                FocusScope.of(context).unfocus();
+                              },
+                              onFieldSubmitted: (_) {
+                                _updateOutfit(_currentOutfitIndex);
+                              },
+                            )
                         )
                             : Text(
                           outfitsForSelectedDate[_currentOutfitIndex].name,
@@ -394,7 +392,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
 
                               if (outfit.accessories.isNotEmpty || _isEditing)
                                 SizedBox(
-                                  height: 140, // Set a fixed height to prevent movement
+                                  height: 140,
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -521,7 +519,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
                       ),
                     ),
                   ),
-                  // Right Side (EDIT)
+
                   Expanded(
                     child: GestureDetector(
                       onTap: () => _editItem(category, outfitIndex),
@@ -612,7 +610,7 @@ class _OutfitsPageState extends State<OutfitsPage> {
                           ),
                         ),
                       ),
-                      // Right Side (EDIT)
+
                       Expanded(
                         child: GestureDetector(
                           onTap: () => _editAccessory(outfitIndex, accessoryIndex),
@@ -866,3 +864,4 @@ class _OutfitsPageState extends State<OutfitsPage> {
     }
   }
 }
+
