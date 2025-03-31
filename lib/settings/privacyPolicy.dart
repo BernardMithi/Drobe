@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 class PrivacyPolicyPage extends StatelessWidget {
-  const PrivacyPolicyPage({super.key});
+  const PrivacyPolicyPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -29,26 +29,46 @@ class PrivacyPolicyPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Last Updated: March 24, 2024',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
+            // Last updated card
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Last Updated: March 24, 2024',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'At Outfit Planner, we take your privacy seriously. This Privacy Policy explains how we collect, use, and share your personal information when you use our mobile application.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 24),
-
-            const Text(
-              'At Outfit Planner, we take your privacy seriously. This Privacy Policy explains how we collect, use, and share your personal information when you use our mobile application.',
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.5,
-                color: Colors.black87,
-              ),
-            ),
-
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
             _buildPolicySection(
               title: '1. INFORMATION WE COLLECT',
@@ -98,8 +118,21 @@ class PrivacyPolicyPage extends StatelessWidget {
   }
 
   Widget _buildPolicySection({required String title, required String content}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -110,7 +143,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             content,
             style: const TextStyle(

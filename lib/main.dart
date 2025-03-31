@@ -1,23 +1,32 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:drobe/services/hiveServiceManager.dart';
+import 'package:drobe/services/outfitStorage.dart';
+import 'package:drobe/auth/authService.dart';
+import 'package:drobe/routes.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:drobe/Wardrobe/wardrobe.dart';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
-import 'Outfits/outfits.dart';
+import 'package:drobe/Outfits/outfits.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:drobe/models/item.dart';
-import 'package:drobe/services/outfitStorage.dart';
 import 'package:drobe/models/outfit.dart';
-import 'package:drobe/services/hiveServiceManager.dart';
 import 'package:drobe/settings/settings.dart';
 import 'package:drobe/settings/profile.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'weather_service.dart';
+import 'package:drobe/Lookbook/lookbook.dart';
+import 'package:drobe/Laundry/laundry.dart';
+import 'package:drobe/auth/authWrapper.dart';
+import 'package:drobe/weather_service.dart';
+import 'package:drobe/Fabrics/fabricTips.dart';
+import 'package:drobe/theme/app_theme.dart';
+import 'package:drobe/settings/profileAvatar.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -30,6 +39,7 @@ class LoadingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: Scaffold(
         body: Center(
           child: Column(
@@ -46,14 +56,26 @@ class LoadingApp extends StatelessWidget {
   }
 }
 
-// Initialize the app properly
+// Initialize the app properly - we'll initialize AuthService here as well
 Future<void> initializeApp() async {
   try {
+    // Set preferred orientations
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
     // Initialize HiveManager (which handles adapter registration)
     await HiveManager().init();
 
     // Initialize OutfitStorageService
     await OutfitStorageService.init();
+
+    // Initialize AuthService (now using Hive)
+    await AuthService().initialize();
+
+    // Create a demo user if needed
+    await AuthService().createDemoUserIfNeeded();
 
     debugPrint('App initialized successfully');
   } catch (e) {
@@ -64,19 +86,35 @@ Future<void> initializeApp() async {
     // Try initialization again
     await HiveManager().init();
     await OutfitStorageService.init();
+    await AuthService().initialize();
   }
 }
 
-Future<void> main() async {
-  // This is the entry point of your app
+// Modify the main function to ensure proper initialization sequence
+void main() async {
+  // This ensures Flutter is initialized before we do anything else
   WidgetsFlutterBinding.ensureInitialized();
 
   // Show a loading screen while we handle initialization
   runApp(const LoadingApp(message: 'Starting app...'));
 
   try {
-    // Initialize the app
-    await initializeApp();
+    // Initialize HiveManager first
+    await HiveManager().init();
+
+    // Initialize OutfitStorageService
+    await OutfitStorageService.init();
+
+    // Initialize AuthService and wait for it to complete
+    final authService = AuthService();
+    final authInitialized = await authService.initialize();
+
+    if (!authInitialized) {
+      debugPrint('Warning: AuthService initialization failed');
+      // We'll continue anyway and let the UI handle this gracefully
+    } else {
+      debugPrint('AuthService initialized successfully');
+    }
 
     // Now run the actual app
     runApp(const MyApp());
@@ -85,6 +123,7 @@ Future<void> main() async {
     debugPrint('Critical error during app initialization: $e');
     runApp(
       MaterialApp(
+        debugShowCheckedModeBanner: false,
         home: Scaffold(
           body: Center(
             child: Column(
@@ -106,7 +145,11 @@ Future<void> main() async {
 
                     // Clear all data and try again
                     await HiveManager().clearAllData();
-                    await initializeApp();
+
+                    // Initialize again
+                    await HiveManager().init();
+                    await OutfitStorageService.init();
+                    await AuthService().initialize();
 
                     // Run the app
                     runApp(const MyApp());
@@ -123,20 +166,139 @@ Future<void> main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Drobe App',
-      theme: ThemeData(
-        primarySwatch: Colors.grey,
-        fontFamily: 'Avenir',
-      ),
-      home: const Homepage(),
+      title: 'Drobe',
+      theme: AppTheme.lightTheme,
+      initialRoute: '/',
+      routes: routes,
+      onGenerateRoute: generateRoute,
       navigatorObservers: [routeObserver],
     );
+  }
+}
+
+// New class to handle app startup and auth initialization
+class AppStartupHandler extends StatefulWidget {
+  const AppStartupHandler({Key? key}) : super(key: key);
+
+  @override
+  State<AppStartupHandler> createState() => _AppStartupHandlerState();
+}
+
+class _AppStartupHandlerState extends State<AppStartupHandler> {
+  bool _isInitializing = true;
+  bool _authInitialized = false;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAuth();
+  }
+
+  Future<void> _initializeAuth() async {
+    try {
+      // Delay to ensure the app is fully rendered
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Try to initialize AuthService
+      final success = await AuthService().initialize();
+
+      if (mounted) {
+        setState(() {
+          _authInitialized = success;
+          _isInitializing = false;
+        });
+      }
+
+      if (success) {
+        // Create a demo user for testing if needed
+        await AuthService().createDemoUserIfNeeded();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error initializing authentication: $e';
+          _isInitializing = false;
+          _authInitialized = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isInitializing) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 20),
+              Text('Initializing app...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_authInitialized) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange),
+              const SizedBox(height: 20),
+              const Text(
+                'Authentication service unavailable',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  _errorMessage.isEmpty
+                      ? 'You can continue using the app without signing in.'
+                      : _errorMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+              ),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const Homepage()),
+                  );
+                },
+                child: const Text('Continue to App'),
+              ),
+              const SizedBox(height: 15),
+              TextButton(
+                onPressed: () async {
+                  setState(() {
+                    _isInitializing = true;
+                  });
+                  await _initializeAuth();
+                },
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Auth initialized successfully, proceed to auth wrapper
+    return const AuthWrapper();
   }
 }
 
@@ -154,12 +316,23 @@ class _HomepageState extends State<Homepage> with RouteAware {
   bool isLoading = true;
   final WeatherService weatherService = WeatherService();
   String greeting = "HI";
+  Map<String, String> _userData = {};
 
   @override
   void initState() {
     super.initState();
+    _loadUserData();
     _loadTodaysOutfits();
     _updateGreeting();
+  }
+
+  Future<void> _loadUserData() async {
+    if (AuthService().isInitialized) {
+      final userData = await AuthService().getCurrentUser();
+      setState(() {
+        _userData = userData;
+      });
+    }
   }
 
   void _updateGreeting() {
@@ -183,6 +356,7 @@ class _HomepageState extends State<Homepage> with RouteAware {
   @override
   void didPopNext() {
     // Refresh when returning to this page.
+    _loadUserData();
     _loadTodaysOutfits();
     _updateGreeting();
     super.didPopNext();
@@ -229,7 +403,11 @@ class _HomepageState extends State<Homepage> with RouteAware {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ProfilePage()),
-    );
+    ).then((_) {
+      // Refresh user data when returning from profile page
+      _loadUserData();
+      setState(() {});
+    });
   }
 
   @override
@@ -240,16 +418,18 @@ class _HomepageState extends State<Homepage> with RouteAware {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Add the profile button to the app bar instead
+          // Profile picture in the app bar
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
-            child: IconButton(
-              icon: const Icon(
-                Icons.account_circle,
+            child: GestureDetector(
+              onTap: _navigateToProfile,
+              child: ProfileAvatar(
+                key: ValueKey('header_avatar_${DateTime.now().millisecondsSinceEpoch}'),
                 size: 42,
-                color: Colors.white,
+                userId: _userData['id'] ?? '',
+                name: _userData['name'] ?? 'User',
+                email: _userData['email'] ?? '',
               ),
-              onPressed: _navigateToProfile,
             ),
           ),
         ],
@@ -280,7 +460,7 @@ class _HomepageState extends State<Homepage> with RouteAware {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '$greeting BERNARD,',
+                    '$greeting ${_userData['name']?.split(' ').first.toUpperCase() ?? 'THERE'},',
                     style: const TextStyle(
                       fontFamily: 'Avenir',
                       fontSize: 24,
@@ -417,12 +597,12 @@ class _HomepageState extends State<Homepage> with RouteAware {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => OutfitsPage()),
+                          MaterialPageRoute(builder: (context) => const OutfitsPage()),
                         );
                       },
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(
                             size: 50,
                             Icons.add_circle_outline,
@@ -482,7 +662,7 @@ class _ImprovedWeatherWidgetState extends State<ImprovedWeatherWidget> {
 
       if (weatherData['success'] == true) {
         setState(() {
-          temperature = weatherData['temperature'];
+          temperature = weatherData['temperature'].toString();
           weatherDescription = weatherData['description'];
           location = weatherData['location'];
 
@@ -516,7 +696,7 @@ class _ImprovedWeatherWidgetState extends State<ImprovedWeatherWidget> {
     return Padding(
       padding: const EdgeInsets.all(10.0),
       child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
         elevation: 3,
         child: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -598,13 +778,13 @@ class DraggableMenuScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.77,
+      initialChildSize: 0.69,
       minChildSize: 0.3,
       maxChildSize: 0.77,
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
           ),
           child: Column(
@@ -631,7 +811,7 @@ class DraggableMenuScreen extends StatelessWidget {
                         Navigator.pop(context);
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => OutfitsPage()),
+                          MaterialPageRoute(builder: (context) => const OutfitsPage()),
                         );
                       },
                     ),
@@ -642,30 +822,40 @@ class DraggableMenuScreen extends StatelessWidget {
                         Navigator.pop(context);
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => WardrobePage()),
+                          MaterialPageRoute(builder: (context) => const WardrobePage()),
                         );
                       },
                     ),
                     MenuTile(
                       icon: Icons.grid_view,
                       label: "LOOKBOOK",
-                    ),
-                    MenuTile(
-                      icon: Icons.local_laundry_service,
-                      label: "LAUNDRY",
-                    ),
-                    MenuTile(
-                      icon: Icons.info_outline,
-                      label: "FABRIC TIPS",
-                    ),
-                    MenuTile(
-                      icon: Icons.account_circle,
-                      label: "ACCOUNT",
                       onTap: () {
                         Navigator.pop(context);
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const ProfilePage()),
+                          MaterialPageRoute(builder: (context) => const LookbookPage()),
+                        );
+                      },
+                    ),
+                    MenuTile(
+                      icon: Icons.local_laundry_service,
+                      label: "LAUNDRY",
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LaundryPage()),
+                        );
+                      },
+                    ),
+                    MenuTile(
+                      icon: Icons.info_outline,
+                      label: "FABRIC TIPS",
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const FabricTipsPage()),
                         );
                       },
                     ),
@@ -693,16 +883,18 @@ class DraggableMenuScreen extends StatelessWidget {
 
 // MenuTile Widget
 class MenuTile extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final String label;
   final VoidCallback? onTap;
 
   const MenuTile({
     super.key,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.label,
     this.onTap,
-  });
+  }) : assert(icon != null || leading != null, 'Either icon or leading must be provided');
 
   @override
   Widget build(BuildContext context) {
@@ -717,7 +909,10 @@ class MenuTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, size: 28, color: Colors.grey[800]),
+            if (leading != null)
+              leading!
+            else if (icon != null)
+              Icon(icon, size: 28, color: Colors.grey[800]),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -828,7 +1023,7 @@ class OutfitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
       elevation: 2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -840,7 +1035,7 @@ class OutfitCard extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => OutfitsPage(),
+                    builder: (context) => const OutfitsPage(),
                   ),
                 );
               },
@@ -877,11 +1072,10 @@ class OutfitCard extends StatelessWidget {
 
     return GridView.count(
       crossAxisCount: 2,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
+      crossAxisSpacing: 2,
       physics: const NeverScrollableScrollPhysics(), // Make grid non-scrollable
       shrinkWrap: true, // Ensure grid takes only the space it needs
-      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+      padding: const EdgeInsets.only(left: 15, right: 15, bottom: 10),
       children: validClothes.map((entry) {
         return _buildClothingItem(entry.key, entry.value!);
       }).toList(),
@@ -949,7 +1143,7 @@ class OutfitCard extends StatelessWidget {
             children: [
               Icon(Icons.arrow_left, size: 14, color: Colors.grey[400]),
               Text(
-                'Scroll for more',
+                'SCROLL FOR MORE',
                 style: TextStyle(fontSize: 10, color: Colors.grey[500]),
               ),
               Icon(Icons.arrow_right, size: 14, color: Colors.grey[400]),
@@ -1106,6 +1300,21 @@ Future<String> getAbsoluteImagePath(String storedPath) async {
     return path.join(directory.path, relativePath);
   } else {
     return path.join(directory.path, storedPath);
+  }
+}
+
+// Helper method to create a demo user if needed
+extension AuthServiceExtension on AuthService {
+  Future<void> createDemoUserIfNeeded() async {
+    if (!isInitialized) {
+      await initialize();
+    }
+
+    if (!isLoggedIn) {
+      // Create a demo user for testing
+      await signup('Demo User', 'demo@example.com', 'password123');
+      debugPrint('Created demo user');
+    }
   }
 }
 

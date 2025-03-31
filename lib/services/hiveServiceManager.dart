@@ -1,28 +1,27 @@
-// lib/services/hiveServiceManager.dart
-import 'package:hive/hive.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:drobe/models/item.dart';
 import 'package:drobe/models/outfit.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-
-// Define constant box names
-const String ITEMS_BOX_NAME = 'itemsBox';
-const String OUTFITS_BOX_NAME = 'outfits';
+import 'package:drobe/models/lookbookItem.dart';
 
 class HiveManager {
+  // Singleton pattern
   static final HiveManager _instance = HiveManager._internal();
   factory HiveManager() => _instance;
   HiveManager._internal();
 
-  bool _initialized = false;
+  // State
+  bool _isInitialized = false;
   final Map<String, Box> _boxes = {};
 
-  // Initialize Hive once at app startup
+  // Getters
+  bool get isInitialized => _isInitialized;
+
+  // Initialize Hive
   Future<void> init() async {
-    if (_initialized) {
-      debugPrint('HiveManager already initialized, skipping');
+    if (_isInitialized) {
+      debugPrint('HiveManager already initialized');
       return;
     }
 
@@ -30,20 +29,14 @@ class HiveManager {
       debugPrint('Initializing HiveManager...');
 
       // Initialize Hive
+      final appDocumentDir = await getApplicationDocumentsDirectory();
+      Hive.init(appDocumentDir.path);
       await Hive.initFlutter();
 
-      // Register all adapters in the correct order
-      if (!Hive.isAdapterRegistered(0)) {
-        Hive.registerAdapter(ItemAdapter());
-        debugPrint('Registered ItemAdapter with typeId 0');
-      }
+      // Register adapters
+      _registerAdapters();
 
-      if (!Hive.isAdapterRegistered(1)) {
-        Hive.registerAdapter(OutfitAdapter());
-        debugPrint('Registered OutfitAdapter with typeId 1');
-      }
-
-      _initialized = true;
+      _isInitialized = true;
       debugPrint('HiveManager initialized successfully');
     } catch (e) {
       debugPrint('Error initializing HiveManager: $e');
@@ -51,134 +44,116 @@ class HiveManager {
     }
   }
 
-  // Get a box with safety checks
+  // Register all adapters
+  void _registerAdapters() {
+    try {
+      // Register Item adapter if not already registered
+      if (!Hive.isAdapterRegistered(0)) {
+        Hive.registerAdapter(ItemAdapter());
+        debugPrint('Registered ItemAdapter with typeId 0');
+      }
+
+      // Register Outfit adapter if not already registered
+      if (!Hive.isAdapterRegistered(1)) {
+        Hive.registerAdapter(OutfitAdapter());
+        debugPrint('Registered OutfitAdapter with typeId 1');
+      }
+
+      // Register LookbookItem adapter if not already registered
+      if (!Hive.isAdapterRegistered(2)) {
+        Hive.registerAdapter(LookbookItemAdapter());
+        debugPrint('Registered LookbookItemAdapter with typeId 2');
+      }
+    } catch (e) {
+      debugPrint('Error registering adapters: $e');
+      // Continue even if registration fails - adapters might be already registered
+    }
+  }
+
+  // Get a box, opening it if necessary
   Future<Box> getBox(String boxName) async {
-    // Make sure Hive is initialized
-    await init();
+    if (!_isInitialized) {
+      await init();
+    }
+
+    // First check if we already have the box in our map
+    if (_boxes.containsKey(boxName) && _boxes[boxName]!.isOpen) {
+      return _boxes[boxName]!;
+    }
 
     try {
-      // Return cached box if it exists and is open
-      if (_boxes.containsKey(boxName) && _boxes[boxName]!.isOpen) {
-        return _boxes[boxName]!;
-      }
-
-      // Open the box if it's not cached or not open
-      Box box;
+      // Check if the box is already open by Hive
       if (Hive.isBoxOpen(boxName)) {
-        box = Hive.box(boxName);
-      } else {
-        box = await Hive.openBox(boxName);
+        final box = Hive.box(boxName);
+        _boxes[boxName] = box;
+        debugPrint('Retrieved already open box: $boxName');
+        return box;
       }
 
+      // If not, open it
+      final box = await Hive.openBox(boxName);
       _boxes[boxName] = box;
+      debugPrint('Opened box: $boxName');
       return box;
     } catch (e) {
       debugPrint('Error opening box $boxName: $e');
 
-      // If there was an error, try to recover by deleting and reopening the box
-      await _recoverBox(boxName);
-
-      // Try again after recovery
-      if (Hive.isBoxOpen(boxName)) {
-        return Hive.box(boxName);
-      } else {
-        return await Hive.openBox(boxName);
+      try {
+        // Try to recover by deleting the box and reopening it
+        await Hive.deleteBoxFromDisk(boxName);
+        final box = await Hive.openBox(boxName);
+        _boxes[boxName] = box;
+        debugPrint('Recovered box: $boxName');
+        return box;
+      } catch (recoveryError) {
+        debugPrint('Failed to recover box $boxName: $recoveryError');
+        // If recovery fails, create an empty box as a last resort
+        final box = await Hive.openBox('temp_$boxName');
+        _boxes[boxName] = box;
+        debugPrint('Created temporary box for: $boxName');
+        return box;
       }
     }
   }
 
-  // Recover a corrupted box
-  Future<void> _recoverBox(String boxName) async {
-    debugPrint('Attempting to recover corrupted box: $boxName');
-
-    try {
-      // Close the box if it's open
-      if (Hive.isBoxOpen(boxName)) {
-        await Hive.box(boxName).close();
-      }
-
-      // Get the application documents directory
-      final appDir = await getApplicationDocumentsDirectory();
-
-      // Delete the box file
-      final boxFile = File('${appDir.path}/$boxName.hive');
-      if (await boxFile.exists()) {
-        await boxFile.delete();
-        debugPrint('Deleted corrupted box file: ${boxFile.path}');
-      }
-
-      // Delete the box lock file
-      final lockFile = File('${appDir.path}/$boxName.lock');
-      if (await lockFile.exists()) {
-        await lockFile.delete();
-        debugPrint('Deleted box lock file: ${lockFile.path}');
-      }
-
-      // Remove from cache
+  // Close a specific box
+  Future<void> closeBox(String boxName) async {
+    if (_boxes.containsKey(boxName) && _boxes[boxName]!.isOpen) {
+      await _boxes[boxName]!.close();
       _boxes.remove(boxName);
-
-    } catch (e) {
-      debugPrint('Error during box recovery: $e');
+      debugPrint('Closed box: $boxName');
     }
   }
 
-  // Close all boxes - useful for cleanup
-  Future<void> closeBoxes() async {
-    for (var boxName in _boxes.keys) {
-      final box = _boxes[boxName];
-      if (box != null && box.isOpen) {
-        await box.close();
+  // Close all boxes
+  Future<void> closeAllBoxes() async {
+    for (final boxName in _boxes.keys.toList()) {
+      if (_boxes[boxName]!.isOpen) {
+        await _boxes[boxName]!.close();
+        debugPrint('Closed box: $boxName');
       }
     }
     _boxes.clear();
   }
 
-  // Force clear the box's contents (use carefully)
+  // Clear a specific box
   Future<void> clearBox(String boxName) async {
-    try {
-      final box = await getBox(boxName);
-      await box.clear();
-      debugPrint('Cleared box: $boxName');
-    } catch (e) {
-      debugPrint('Error clearing box $boxName: $e');
-    }
+    final box = await getBox(boxName);
+    await box.clear();
+    debugPrint('Cleared box: $boxName');
   }
 
-  // Safely clear all Hive data
+  // Clear all boxes
   Future<void> clearAllData() async {
-    debugPrint('Clearing all Hive data...');
-
     try {
-      // Close all open boxes first
-      await closeBoxes();
-
-      // Get the application documents directory
-      final appDir = await getApplicationDocumentsDirectory();
-
-      // Find and delete all .hive and .lock files
-      final files = await appDir.list().toList();
-      for (final entity in files) {
-        if (entity is File &&
-            (entity.path.endsWith('.hive') || entity.path.endsWith('.lock'))) {
-          await entity.delete();
-          debugPrint('Deleted Hive file: ${entity.path}');
-        }
-      }
-
-      // Reset initialization flag to force re-initialization
-      _initialized = false;
-
-      debugPrint('All Hive data cleared successfully');
+      await Hive.deleteFromDisk();
+      _boxes.clear();
+      _isInitialized = false;
+      debugPrint('Cleared all Hive data');
     } catch (e) {
       debugPrint('Error clearing Hive data: $e');
+      rethrow;
     }
-  }
-
-  // Get typed item from box safely
-  T? getTypedItem<T>(dynamic boxItem) {
-    if (boxItem is T) {
-      return boxItem;
-    }
-    return null;
   }
 }
+

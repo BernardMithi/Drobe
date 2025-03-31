@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'contactUs.dart';
+import 'package:drobe/settings/contactUs.dart';
 
 class HelpCenterPage extends StatefulWidget {
-  const HelpCenterPage({super.key});
+  const HelpCenterPage({Key? key}) : super(key: key);
 
   @override
   State<HelpCenterPage> createState() => _HelpCenterPageState();
@@ -70,7 +70,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -98,57 +98,129 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
               decoration: InputDecoration(
                 hintText: 'Search for help',
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                filled: true,
-                fillColor: Colors.grey[100],
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: Colors.grey.shade300),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.black),
+                ),
+                filled: true,
+                fillColor: Colors.white,
               ),
             ),
           ),
-
 
           // FAQ List
           Expanded(
             child: _filteredFaqItems.isEmpty
-                ? const Center(
-              child: Text(
-                'No results found',
-                style: TextStyle(color: Colors.grey),
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No results found',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Try a different search term',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             )
                 : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _filteredFaqItems.length,
               itemBuilder: (context, index) {
-                return _buildFaqItem(_filteredFaqItems[index]);
+                return _buildFaqCard(_filteredFaqItems[index]);
               },
             ),
           ),
 
-          // Contact Support
+          // Contact Support Button Card
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ContactUsPage()),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
                 ),
-              ),
-              child: const Text(
-                'CONTACT SUPPORT',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Need more help?',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Our support team is ready to assist you with any questions or issues.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Centered button
+                  Center(
+                    child: SizedBox(
+                      width: 200, // Fixed width for the button
+                      child: FloatingActionButton.extended(
+                        heroTag: 'contact_support_fab',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ContactUsPage()),
+                          );
+                        },
+                        label: const Text(
+                          'CONTACT SUPPORT',
+                          style: TextStyle(
+                            fontFamily: 'Avenir',
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        backgroundColor: Colors.grey[300],
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        extendedPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        isExtended: true,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -157,62 +229,52 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     );
   }
 
-  Widget _buildCategoryCard(String title, IconData icon) {
+  Widget _buildFaqCard(FAQItem item) {
     return Container(
-      width: 120,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Colors.grey[300]!),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          colorScheme: ColorScheme.fromSwatch().copyWith(
+            secondary: Colors.black,
+          ),
         ),
-        child: InkWell(
-          onTap: () {
-            // Filter FAQs by category
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 28),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
+        child: ExpansionTile(
+          title: Text(
+            item.question,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 1),
+            Text(
+              item.answer,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+                height: 1.5,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildFaqItem(FAQItem item) {
-    return ExpansionTile(
-      title: Text(
-        item.question,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      children: [
-        Text(
-          item.answer,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-            height: 2,
-          ),
-        ),
-      ],
     );
   }
 }

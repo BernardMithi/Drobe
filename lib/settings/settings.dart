@@ -1,426 +1,339 @@
 import 'package:flutter/material.dart';
-import 'contactUs.dart';
-import 'helpCenter.dart';
-import 'notifications.dart';
-import 'passwordChange.dart';
-import 'privacyPolicy.dart';
-import 'profile.dart';
-import 'term.dart';
+import 'package:drobe/auth/authService.dart';
+import 'package:drobe/settings/passwordChange.dart';
+import 'package:drobe/settings/privacyPolicy.dart';
+import 'package:drobe/settings/term.dart';
+import 'package:drobe/settings/contactUs.dart';
+import 'package:drobe/settings/notifications.dart';
+import 'package:drobe/settings/helpCenter.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({Key? key}) : super(key: key);
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  _SettingsPageState createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // Settings state
-  bool _notificationsEnabled = true;
-  bool _darkMode = false;
-  String _selectedUnit = 'Celsius';
-  String _selectedCurrency = 'USD';
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
+  Map<String, String> _userData = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Ensure AuthService is initialized before using it
+      final authService = AuthService();
+      final initialized = await authService.ensureInitialized();
+
+      if (!initialized) {
+        // Handle initialization failure
+        setState(() {
+          _isLoading = false;
+          // Set default empty data
+          _userData = {'name': '', 'email': ''};
+        });
+        return;
+      }
+
+      final userData = await authService.getCurrentUser();
+
+      setState(() {
+        _userData = userData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      setState(() {
+        _isLoading = false;
+        // Set default empty data
+        _userData = {'name': '', 'email': ''};
+      });
+    }
+  }
+
+  Future<void> _logout() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final success = await _authService.logout();
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (success && mounted) {
+      // Navigate to login page and remove all previous routes
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to log out')),
+      );
+    }
+  }
+
+  List<SettingsItem> get _settingsItems => [
+    SettingsItem(
+      icon: Icons.person,
+      iconColor: Colors.blue,
+      title: 'Profile',
+      subtitle: 'Manage your account information',
+      onTap: () {
+        Navigator.of(context).pushNamed('/settings/profile');
+      },
+    ),
+    SettingsItem(
+      icon: Icons.notifications_none,
+      iconColor: Colors.amber,
+      title: 'Notifications',
+      subtitle: 'Manage outfit and laundry reminders',
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const NotificationsPage(),
+          ),
+        );
+      },
+    ),
+    SettingsItem(
+      icon: Icons.privacy_tip,
+      iconColor: Colors.green,
+      title: 'Privacy',
+      subtitle: 'View privacy policy',
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const PrivacyPolicyPage(),
+          ),
+        );
+      },
+    ),
+    SettingsItem(
+      icon: Icons.description,
+      iconColor: Colors.purple,
+      title: 'Terms of Service',
+      subtitle: 'View terms of service',
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const TermsOfServicePage(),
+          ),
+        );
+      },
+    ),
+    SettingsItem(
+      icon: Icons.lock_outline,
+      iconColor: Colors.orange,
+      title: 'Change Password',
+      subtitle: 'Update your password',
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const PasswordChangePage(),
+          ),
+        );
+      },
+    ),
+    SettingsItem(
+      icon: Icons.help,
+      iconColor: Colors.teal,
+      title: 'Help & Support',
+      subtitle: 'Get help with the app',
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const HelpCenterPage(),
+          ),
+        );
+      },
+    ),
+    SettingsItem(
+      icon: Icons.mail_outline,
+      iconColor: Colors.blue,
+      title: 'Contact Us',
+      subtitle: 'Get in touch with our team',
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const ContactUsPage(),
+          ),
+        );
+      },
+    ),
+    SettingsItem(
+      icon: Icons.info,
+      iconColor: Colors.indigo,
+      title: 'About',
+      subtitle: 'App information and version',
+      onTap: () {
+        _showAboutDialog(context);
+      },
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
+        title: const Text('SETTINGS'),
         backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
         elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'SETTINGS',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            child: const CircleAvatar(
-              backgroundColor: Color(0xFF4A4A4A),
-              child: Icon(Icons.person, color: Colors.white),
-            ),
-          ),
-        ],
       ),
-      body: ListView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+        padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const SizedBox(height: 20),
+          const SizedBox(height: 6),
 
-          // Account section
-          _buildSectionHeader('Account'),
-          _buildSettingItem(
-            'Profile',
-            'Edit your personal information',
-            Icons.person_outline,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfilePage()),
-              );
-            },
-          ),
-          _buildSettingItem(
-            'Password',
-            'Change your password',
-            Icons.lock_outline,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PasswordPage()),
-              );
-            },
-          ),
-          _buildSettingItem(
-            'Notifications',
-            'Manage your notifications',
-            Icons.notifications_none,
-            toggle: true,
-            toggleValue: _notificationsEnabled,
-            onToggleChanged: (value) {
-              setState(() {
-                _notificationsEnabled = value;
-              });
-            },
-          ),
+          // Settings Items
+          ..._settingsItems.map((item) => _buildSettingsTile(
+            icon: item.icon,
+            iconColor: item.iconColor,
+            title: item.title,
+            subtitle: item.subtitle,
+            onTap: item.onTap,
+          )).toList(),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
-          // Appearance section
-          _buildSectionHeader('Appearance'),
-          _buildSettingItem(
-            'Dark Mode',
-            'Switch between light and dark theme',
-            Icons.dark_mode_outlined,
-            toggle: true,
-            toggleValue: _darkMode,
-            onToggleChanged: (value) {
-              setState(() {
-                _darkMode = value;
-              });
-            },
-          ),
-          const SizedBox(height: 20),
-          // Support section
-          _buildSectionHeader('Support'),
-          _buildSettingItem(
-            'Help Center',
-            'Get help with the app',
-            Icons.help_outline,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const HelpCenterPage()),
-              );
-            },
-          ),
-          _buildSettingItem(
-            'Contact Us',
-            'Reach out to our support team',
-            Icons.mail_outline,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ContactUsPage()),
-              );
-            },
-          ),
-
-          const SizedBox(height: 20),
-
-          // About section
-          _buildSectionHeader('About'),
-          _buildSettingItem(
-            'Version',
-            '1.0.0',
-            Icons.info_outline,
-            onTap: () {},
-          ),
-          _buildSettingItem(
-            'Terms of Service',
-            'Read our terms and conditions',
-            Icons.description_outlined,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TermsPage()),
-              );
-            },
-          ),
-          _buildSettingItem(
-            'Privacy Policy',
-            'Read our privacy policy',
-            Icons.privacy_tip_outlined,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PrivacyPolicyPage()),
-              );
-            },
-          ),
-
-          const SizedBox(height: 20),
-
-          // Logout button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ElevatedButton(
-              onPressed: () {
-                _showLogoutDialog();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade50,
-                foregroundColor: Colors.red,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: const Text(
-                'Log Out',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 40),
+          // App Version
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingItem(
-      String title,
-      String subtitle,
-      IconData icon, {
-        Function()? onTap,
-        bool toggle = false,
-        bool? toggleValue,
-        Function(bool)? onToggleChanged,
-      }) {
-    return InkWell(
-      onTap: toggle ? null : onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                icon,
-                color: Colors.black,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (toggle)
-              Switch(
-                value: toggleValue ?? false,
-                onChanged: onToggleChanged,
-                activeColor: Colors.black,
-              )
-            else
-              const Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey,
-                size: 16,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showUnitPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: Text(
-                  'Temperature Unit',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ListTile(
-                title: const Text('Celsius'),
-                trailing: _selectedUnit == 'Celsius'
-                    ? const Icon(Icons.check, color: Colors.black)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _selectedUnit = 'Celsius';
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text('Fahrenheit'),
-                trailing: _selectedUnit == 'Fahrenheit'
-                    ? const Icon(Icons.check, color: Colors.black)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _selectedUnit = 'Fahrenheit';
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showCurrencyPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: Text(
-                  'Currency',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ListTile(
-                title: const Text('USD - US Dollar'),
-                trailing: _selectedCurrency == 'USD'
-                    ? const Icon(Icons.check, color: Colors.black)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _selectedCurrency = 'USD';
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text('EUR - Euro'),
-                trailing: _selectedCurrency == 'EUR'
-                    ? const Icon(Icons.check, color: Colors.black)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _selectedCurrency = 'EUR';
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text('GBP - British Pound'),
-                trailing: _selectedCurrency == 'GBP'
-                    ? const Icon(Icons.check, color: Colors.black)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _selectedCurrency = 'GBP';
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Log Out'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Perform logout
-            },
-            child: const Text('LOG OUT', style: TextStyle(color: Colors.red)),
+  Widget _buildSettingsTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: iconColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontFamily: 'Avenir',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontFamily: 'Avenir',
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
+
+  void _showAboutDialog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'Drobe',
+      applicationVersion: 'v1.0.0',
+      applicationIcon: Image.asset(
+        'assets/images/drobe_logo.png',
+        height: 50,
+        width: 50,
+      ),
+      applicationLegalese: '© 2024 Drobe. All rights reserved.',
+      children: [
+        const SizedBox(height: 24),
+        const Text(
+          'Drobe is your personal capsule wardrobe assistant, helping you organize your clothes and plan your outfits.',
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SettingsItem {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  SettingsItem({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 }
 

@@ -44,10 +44,11 @@ class WeatherService {
         final data = jsonDecode(response.body);
 
         return {
-          'temperature': "${data['main']['temp'].round()}°C",
+          'temperature': data['main']['temp'],
           'description': data['weather'][0]['description'].toString().toUpperCase(),
           'location': "${data['name']}, ${data['sys']['country']}",
           'conditionCode': data['weather'][0]['id'],
+          'condition': data['weather'][0]['main'],
           'success': true
         };
       } else {
@@ -64,9 +65,40 @@ class WeatherService {
     }
   }
 
+  /// Get current weather data
+  Future<Map<String, dynamic>> getCurrentWeather() async {
+    try {
+      final position = await getLocation();
+      final weatherData = await fetchWeather(position.latitude, position.longitude);
+
+      if (weatherData['success'] == true) {
+        return {
+          'temperature': weatherData['temperature'],
+          'description': weatherData['description'],
+          'condition': weatherData['condition'],
+          'location': weatherData['location'],
+        };
+      } else {
+        return {
+          'temperature': 20.0,
+          'description': 'Weather data unavailable',
+          'condition': 'Clear',
+          'location': 'Unknown',
+        };
+      }
+    } catch (e) {
+      debugPrint('Error getting weather: $e');
+      return {
+        'temperature': 20.0,
+        'description': 'Weather data unavailable',
+        'condition': 'Clear',
+        'location': 'Unknown',
+      };
+    }
+  }
+
   /// Get appropriate weather icon based on condition code
   IconData getWeatherIcon(int conditionCode) {
-
     if (conditionCode >= 200 && conditionCode < 300) {
       return Icons.flash_on; // Thunderstorm
     } else if (conditionCode >= 300 && conditionCode < 400) {

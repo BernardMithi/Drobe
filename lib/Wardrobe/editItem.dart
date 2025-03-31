@@ -409,7 +409,7 @@ class _EditItemPageState extends State<EditItemPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Edit Item"),
+        title: const Text("EDIT ITEM"),
         centerTitle: true,
         actions: [
           Padding(

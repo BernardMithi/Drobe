@@ -387,7 +387,7 @@ class _AddItemPageState extends State<AddItemPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Add New Item"),
+        title: const Text("ADD NEW ITEM"),
         centerTitle: true,
         actions: const [
           Padding(

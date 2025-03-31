@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
-import 'productDetails.dart';
 import 'package:drobe/models/item.dart';
+import 'package:drobe/services/hiveServiceManager.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:path_provider/path_provider.dart';
@@ -27,21 +27,42 @@ class ItemSelectionPage extends StatefulWidget {
 }
 
 class _ItemSelectionPageState extends State<ItemSelectionPage> {
-  late Box itemsBox;
+  Box? itemsBox;
   final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
   bool _hasHandledInitialNavigation = false;
   bool _filterByColorPalette = true; // Default to filtering by color palette
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    itemsBox = Hive.box('itemsBox');
+    _loadItemsBox();
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text;
       });
     });
+  }
+
+  Future<void> _loadItemsBox() async {
+    try {
+      final hiveManager = HiveManager();
+      itemsBox = await hiveManager.getBox('itemsBox');
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading items box: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -192,7 +213,9 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
   }
 
   List<Item> get filteredItems {
-    final List<Item> items = itemsBox.values.cast<Item>().where((item) {
+    if (itemsBox == null) return [];
+
+    final List<Item> items = itemsBox!.values.whereType<Item>().where((item) {
       // Check if slot is null first
       if (widget.slot == null) {
         // No slot specified, show all items
@@ -327,6 +350,24 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading indicator while the box is being loaded
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text((widget.slot ?? "").toUpperCase() + " ITEMS"),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.pop(context);
+              }
+            },
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final items = filteredItems;
     final bool hasPalette = widget.colorPalette != null && widget.colorPalette!.isNotEmpty;
 
@@ -480,8 +521,37 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
                 final item = items[index];
                 return GestureDetector(
                   onTap: () {
-                    if (Navigator.of(context).canPop()) {
-                      Navigator.pop(context, {'item': item});
+                    if (item.inLaundry && widget.fromCreateOutfit) {
+                      // Show warning dialog for items in laundry
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Item in Laundry'),
+                          content: Text(
+                            'This ${item.name} is currently in laundry. Remember to do laundry before the day you plan to wear it!',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context); // Close dialog
+                                if (Navigator.of(context).canPop()) {
+                                  Navigator.pop(context, {'item': item}); // Return the item anyway
+                                }
+                              },
+                              child: const Text('Use Anyway'),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      // Item is clean or not for an outfit, return it directly
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.pop(context, {'item': item});
+                      }
                     }
                   },
                   child: Card(

@@ -1,7 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:drobe/auth/authService.dart';
+import 'package:drobe/settings/passwordChange.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+import 'package:drobe/settings/profileAvatar.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({Key? key}) : super(key: key);
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -9,250 +16,358 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController(text: "Alex Johnson");
-  final _emailController = TextEditingController(text: "alex.johnson@example.com");
-  final _phoneController = TextEditingController(text: "+1 (555) 123-4567");
-  String _selectedGender = "Male";
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  bool _isLoading = true;
+  bool _isSaving = false;
+  Map<String, String> _userData = {};
 
-  // Add a state variable to track whether contact info is in edit mode
-  bool _contactEditMode = false;
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'PROFILE',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(height: 20),
-              // Profile Picture
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.grey[300],
-                    child: const Icon(
-                      Icons.person,
-                      size: 60,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
+  Future<void> _loadUserData() async {
+    setState(() {
+      _isLoading = true;
+    });
 
-              // Form Fields
-              _buildTextField(
-                label: "Full Name",
-                controller: _nameController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your name';
-                  }
-                  return null;
-                },
-              ),
+    try {
+      final userData = await AuthService().getCurrentUser();
 
-              const SizedBox(height: 24),
+      setState(() {
+        _userData = userData;
+        _nameController.text = userData['name'] ?? '';
+        _emailController.text = userData['email'] ?? '';
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
 
-              // Contact Information Section with Edit Mode
-              _buildContactSection(),
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading profile: $e')),
+        );
+      }
+    }
+  }
 
-              const SizedBox(height: 16),
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
+    setState(() {
+      _isSaving = true;
+    });
 
+    try {
+      final success = await AuthService().updateProfile(
+        _nameController.text.trim(),
+        _emailController.text.trim(),
+      );
 
-              const SizedBox(height: 40),
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully')),
+        );
 
-              // Save Button
-              ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    // Save profile
-                    setState(() {
-                      _contactEditMode = false; // Exit edit mode on save
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Profile updated successfully')),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'SAVE CHANGES',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+        // Reload user data to reflect changes
+        await _loadUserData();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update profile')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating profile: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _selectProfileImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        // Show loading indicator
+        setState(() {
+          _isLoading = true;
+        });
+
+        final directory = await getApplicationDocumentsDirectory();
+        final userId = _userData['id'] ?? 'default';
+        final profileImagePath = path.join(directory.path, 'profile_$userId.jpg');
+
+        // Copy the selected image to the app's documents directory
+        final File imageFile = File(image.path);
+        await imageFile.copy(profileImagePath);
+
+        // Save the profile image using AuthService
+        await AuthService().saveProfileImage(imageFile);
+
+        // Reload user data to refresh the UI
+        await _loadUserData();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile picture updated successfully')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error selecting profile image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting profile image: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _navigateToPasswordChange() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PasswordChangePage()),
     );
   }
 
-  // New method to build the contact section with edit mode
-  Widget _buildContactSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "CONTACT INFORMATION",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Colors.black87,
-                ),
-              ),
-              // Edit button
-              TextButton.icon(
-                onPressed: () {
+  void _logout() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              setState(() {
+                _isLoading = true;
+              });
+
+              try {
+                final success = await AuthService().logout();
+
+                if (success && mounted) {
+                  // Navigate to login screen
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/login',
+                        (route) => false,
+                  );
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to logout')),
+                  );
                   setState(() {
-                    _contactEditMode = !_contactEditMode;
+                    _isLoading = false;
                   });
-                },
-                icon: Icon(
-                  _contactEditMode ? Icons.check : Icons.edit,
-                  size: 18,
-                  color: Colors.black54,
-                ),
-                label: Text(
-                  _contactEditMode ? "Done" : "Edit",
-                  style: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 14,
-                  ),
-                ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(0, 0),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Email field - conditionally editable
-          _buildTextField(
-            label: "Email",
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            enabled: _contactEditMode,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your email';
-              } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                return 'Please enter a valid email';
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error during logout: $e')),
+                  );
+                  setState(() {
+                    _isLoading = false;
+                  });
+                }
               }
-              return null;
             },
-          ),
-
-          const SizedBox(height: 16),
-
-          // Phone field - conditionally editable
-          _buildTextField(
-            label: "Phone Number",
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            enabled: _contactEditMode,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your phone number';
-              }
-              return null;
-            },
+            child: const Text('Logout'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField({
-    required String label,
-    required TextEditingController controller,
-    TextInputType keyboardType = TextInputType.text,
-    FormFieldValidator<String>? validator,
-    bool enabled = true,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      enabled: enabled,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: enabled ? Colors.grey[100] : Colors.grey[50],
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        // Show a lock icon when disabled
-        suffixIcon: !enabled
-            ? const Icon(Icons.lock_outline, size: 18, color: Colors.grey)
-            : null,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('PROFILE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
-      validator: validator,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Profile picture section
+            Center(
+              child: GestureDetector(
+                onTap: _selectProfileImage,
+                child: Stack(
+                  children: [
+                    ProfileAvatar(
+                      key: ValueKey('profile_avatar_${DateTime.now().millisecondsSinceEpoch}'),
+                      size: 120,
+                      userId: _userData['id'] ?? '',
+                      name: _userData['name'] ?? '',
+                      email: _userData['email'] ?? '',
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Icon(
+                          Icons.camera_alt,
+                          size: 24,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Profile form
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  // Name field
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Name',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your name';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Email field
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.email),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your email';
+                      }
+                      if (!value.contains('@') || !value.contains('.')) {
+                        return 'Please enter a valid email';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Save button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _saveProfile,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                          : const Text('SAVE CHANGES'),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Change password button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _navigateToPasswordChange,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('CHANGE PASSWORD'),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Logout button
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _logout,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('LOGOUT'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

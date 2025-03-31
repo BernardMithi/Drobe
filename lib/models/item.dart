@@ -59,6 +59,7 @@ class Item extends HiveObject {
 
   void markAsClean() {
     inLaundry = false;
+    wearCount = 0;
     save();
   }
 

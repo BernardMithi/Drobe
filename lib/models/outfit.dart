@@ -66,7 +66,7 @@ class Outfit extends HiveObject {
     List<String>? colorPaletteStrings,
   }) {
     return Outfit(
-      id: id ?? this.id,
+      id: id ?? this.id, // Ensure ID is preserved
       name: name ?? this.name,
       date: date ?? this.date,
       clothes: clothes ?? Map<String, String?>.from(this.clothes),

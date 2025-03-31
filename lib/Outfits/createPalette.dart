@@ -26,6 +26,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   int _paletteSize = 3;
   bool _isLoading = true;
   List<ColorTile> _wardrobeColors = []; // To store all wardrobe colors
+  bool _useGreyPalette = false; // Only use grey when needed
 
   @override
   void initState() {
@@ -36,13 +37,25 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
     _loadWardrobeColors();
   }
 
-  // Initial palette
+  // Initial palette with shades of grey only
   final List<ColorTile> _palette = [
     ColorTile(color: Colors.grey.shade200),
-    ColorTile(color: Colors.teal.shade100),
-    ColorTile(color: Colors.teal.shade200),
-    ColorTile(color: Colors.teal.shade300),
+    ColorTile(color: Colors.grey.shade300),
+    ColorTile(color: Colors.grey.shade400),
+    ColorTile(color: Colors.grey.shade500),
   ];
+
+  // Get a list of grey shades for default palette
+  List<Color> _getGreyShades() {
+    return [
+      Colors.grey.shade200,
+      Colors.grey.shade300,
+      Colors.grey.shade400,
+      Colors.grey.shade500,
+      Colors.grey.shade600,
+      Colors.grey.shade700,
+    ];
+  }
 
   // Load all colors from the wardrobe items
   Future<void> _loadWardrobeColors() async {
@@ -122,11 +135,6 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
       print('Processed ${items.length} items from box');
 
-      // If we still have no items, it might be that:
-      // 1. No items have been added
-      // 2. Items are in a different box
-      // 3. The adapter is not correctly handling the data
-
       if (items.isEmpty) {
         // Check if any other box might contain our items
         final boxNames = ['items', 'wardrobe', 'wardrobeItems', 'item'];
@@ -141,22 +149,16 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
           }
         }
 
-        // Let's add a test item to see if that works
-        print('Adding a test item with colors to the box');
-        final testItem = Item(
-          id: 'test-item-${DateTime.now().millisecondsSinceEpoch}',
-          imageUrl: 'https://example.com/test.jpg',
-          name: 'Test Item',
-          description: 'Test item with colors',
-          colors: [0xFF0000, 0x00FF00, 0x0000FF], // Red, Green, Blue
-          category: 'test',
-        );
+        // Reset palette to grey shades
+        _resetToGreyPalette();
+        _useGreyPalette = true;
 
-        await itemsBox.put(testItem.id, testItem);
-        print('Test item added. Box length now: ${itemsBox.length}');
-
-        // Add to our items list
-        items.add(testItem);
+        // Show notification to user after UI is built
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showGreyPaletteNotification("Using grayscale palette because your wardrobe is empty.");
+          }
+        });
       }
 
       // Process colors
@@ -167,6 +169,18 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
           for (int colorValue in item.colors!) {
             // Ensure color value has alpha
             final colorWithAlpha = colorValue | 0xFF000000;
+
+            // Skip pure red, green, and blue colors (more comprehensive check)
+            Color color = Color(colorWithAlpha);
+            bool isPureRed = color.red > 240 && color.green < 30 && color.blue < 30;
+            bool isPureGreen = color.green > 240 && color.red < 30 && color.blue < 30;
+            bool isPureBlue = color.blue > 240 && color.red < 30 && color.green < 30;
+
+            if (isPureRed || isPureGreen || isPureBlue) {
+              print('Filtered out test color: 0x${colorWithAlpha.toRadixString(16)}');
+              continue;
+            }
+
             if (!colorMap.containsKey(colorWithAlpha)) {
               try {
                 colorMap[colorWithAlpha] = ColorTile(
@@ -185,11 +199,29 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
       final uniqueColors = colorMap.values.toList();
       print('Found ${uniqueColors.length} unique colors');
 
+      // Check if we have any real wardrobe colors
+      if (uniqueColors.isEmpty) {
+        _useGreyPalette = true;
+
+        // Show notification to user after UI is built
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showGreyPaletteNotification("Using grayscale palette because no colors were found in your wardrobe items.");
+          }
+        });
+      } else {
+        // We have real colors from the wardrobe
+        _useGreyPalette = false;
+      }
+
       if (mounted) {
         setState(() {
           _wardrobeColors = uniqueColors;
-          if (_wardrobeColors.isNotEmpty) {
+          if (_wardrobeColors.isNotEmpty && !_useGreyPalette) {
             _updatePaletteWithWardrobeColors();
+          } else {
+            // If no wardrobe colors were found, ensure we use grey palette
+            _resetToGreyPalette();
           }
           _isLoading = false;
         });
@@ -198,15 +230,59 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
     } catch (e) {
       print('Error in _loadWardrobeColors: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          // On error, reset to grey palette
+          _resetToGreyPalette();
+          _useGreyPalette = true;
+          _isLoading = false;
+        });
+
+        // Show notification to user after UI is built
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showGreyPaletteNotification("Using grayscale palette due to an error loading your wardrobe colors.");
+          }
+        });
       }
+    }
+  }
+
+  // Show notification about using grey palette
+  void _showGreyPaletteNotification(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.grey[700],
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
+  // Reset palette to grey shades
+  void _resetToGreyPalette() {
+    List<Color> greyShades = _getGreyShades();
+
+    for (int i = 0; i < _palette.length; i++) {
+      _palette[i] = ColorTile(
+        color: greyShades[i % greyShades.length],
+      );
     }
   }
 
   // Update palette with wardrobe colors
   void _updatePaletteWithWardrobeColors() {
-    // If no wardrobe colors available, keep the default palette
-    if (_wardrobeColors.isEmpty) return;
+    // If no wardrobe colors available or we're forcing grey palette, keep the default palette
+    if (_wardrobeColors.isEmpty || _useGreyPalette) {
+      _resetToGreyPalette();
+      return;
+    }
 
     // Use wardrobe colors for the palette
     int count = min(_palette.length, _wardrobeColors.length);
@@ -385,18 +461,23 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                             selectedDate: selectedDate,
                           ),
                         ),
-                      ).then((newOutfit) {
-                        if (newOutfit != null) {
+                      ).then((result) {
+                        if (result != null) {
                           Map<String, dynamic> outfitData;
 
-                          if (newOutfit is Map<String, dynamic>) {
-                            outfitData = newOutfit;
+                          if (result is Map<String, dynamic>) {
+                            outfitData = result;
+                            // Make sure we include the date in the returned data
+                            if (!outfitData.containsKey('date') && result.containsKey('outfit')) {
+                              final outfit = result['outfit'];
+                              outfitData['date'] = outfit.date?.toString() ?? selectedDate.toString();
+                            }
                           } else {
                             outfitData = {
-                              'name': newOutfit.name ?? "Outfit for ${selectedDate.toString().split(' ')[0]}",
-                              'date': newOutfit.date?.toString() ?? selectedDate.toString(),
-                              'clothes': newOutfit.clothes ?? <String, String?>{},
-                              'accessories': newOutfit.accessories ?? <String>[],
+                              'name': result.name ?? "Outfit for ${selectedDate.toString().split(' ')[0]}",
+                              'date': result.date?.toString() ?? selectedDate.toString(),
+                              'clothes': result.clothes ?? <String, String?>{},
+                              'accessories': result.accessories ?? <String>[],
                               'colorPalette': chosenColors,
                             };
                           }
@@ -470,6 +551,11 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
   /// **Edit Color Method**
   Future<void> _editColor(int i) async {
+    // Choose which colors to show based on availability
+    List<ColorTile> colorsToShow = _useGreyPalette || _wardrobeColors.isEmpty
+        ? _getGreyShades().map((color) => ColorTile(color: color)).toList()
+        : _wardrobeColors;
+
     await showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -480,9 +566,9 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "Select a Color",
-                style: TextStyle(
+              Text(
+                _useGreyPalette ? "Select a Grayscale Color" : "Select a Color from Your Wardrobe",
+                style: const TextStyle(
                   fontFamily: 'Avenir',
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -493,7 +579,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: _wardrobeColors.map((colorTile) {
+                children: colorsToShow.map((colorTile) {
                   return GestureDetector(
                     onTap: () {
                       setState(() {
@@ -534,18 +620,28 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   /// **Generate New Color Palette from Wardrobe Colors**
   Future<void> _generatePalette() async {
     print('Wardrobe colors count: ${_wardrobeColors.length}');
+    print('Use grey palette: $_useGreyPalette');
 
+    // Only use grey palette if there are no wardrobe colors
     if (_wardrobeColors.isEmpty) {
-      // No wardrobe colors available
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("No colors found in your wardrobe. Add some items with colors first."),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      print('No wardrobe colors available, using grey shades');
+      setState(() {
+        List<Color> greyShades = _getGreyShades();
+        greyShades.shuffle(); // Randomize the order
+
+        for (int i = 0; i < _palette.length; i++) {
+          if (!_palette[i].isLocked) {
+            _palette[i] = ColorTile(
+              color: greyShades[i % greyShades.length],
+            );
+          }
+        }
+      });
       return;
     }
 
+    // Use wardrobe colors if available
+    print('Using colors from wardrobe');
     setState(() {
       List<ColorTile> availableColors = List.from(_wardrobeColors);
       availableColors.shuffle(); // Randomize the order
@@ -581,7 +677,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
 Future<void> _checkItemsExistence() async {
   try {
-    final itemsBox = await HiveManager().getBox(ITEMS_BOX_NAME);
+    final itemsBox = await HiveManager().getBox('itemsBox');
     print('Items box exists: ${itemsBox != null}');
     print('Items count: ${itemsBox.length}');
 

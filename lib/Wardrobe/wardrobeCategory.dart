@@ -37,7 +37,7 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
 
   Future<void> _loadBox() async {
     try {
-      itemsBox = await _hiveManager.getBox(ITEMS_BOX_NAME);
+      itemsBox = await _hiveManager.getBox('itemsBox');
       if (mounted) {
         setState(() {
           _isLoading = false;

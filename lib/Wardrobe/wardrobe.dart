@@ -1,15 +1,32 @@
 import 'package:flutter/material.dart';
 import 'wardrobeCategory.dart';
+import 'package:drobe/settings/profile.dart'; // Correct import for ProfilePage
+import 'package:drobe/settings/profileAvatar.dart';
+import 'package:drobe/auth/authService.dart';
 
-class WardrobePage extends StatelessWidget {
+class WardrobePage extends StatefulWidget { // Changed to StatefulWidget
   const WardrobePage({super.key});
+
+  @override
+  State<WardrobePage> createState() => _WardrobePageState();
+}
+
+class _WardrobePageState extends State<WardrobePage> {
+  // Key to force refresh of the avatar
+  Key _avatarKey = ValueKey('wardrobe_avatar_${DateTime.now().millisecondsSinceEpoch}');
+
+  void _refreshAvatar() {
+    setState(() {
+      _avatarKey = ValueKey('wardrobe_avatar_${DateTime.now().millisecondsSinceEpoch}');
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'YOUR WARDROBE',
+            'YOUR WARDROBE',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
         ),
         centerTitle: true,
@@ -19,10 +36,33 @@ class WardrobePage extends StatelessWidget {
             Navigator.pop(context);
           },
         ),
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16.0),
-            child: Icon(Icons.account_circle, size: 40),
+            padding: const EdgeInsets.only(right: 8.0),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                ).then((_) {
+                  // Refresh when returning from profile page
+                  _refreshAvatar();
+                });
+              },
+              child: FutureBuilder<Map<String, String>>(
+                future: AuthService().getCurrentUser(),
+                builder: (context, snapshot) {
+                  final userData = snapshot.data ?? {'id': '', 'name': '', 'email': ''};
+                  return ProfileAvatar(
+                    key: _avatarKey,
+                    size: 42,
+                    userId: userData['id'] ?? '',
+                    name: userData['name'] ?? '',
+                    email: userData['email'] ?? '',
+                  );
+                },
+              ),
+            ),
           ),
         ],
       ),
@@ -73,3 +113,4 @@ class WardrobePage extends StatelessWidget {
     );
   }
 }
+

@@ -1,24 +1,21 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'itemSelection.dart';
-import 'dart:io';
-import 'package:drobe/models/outfit.dart';
 import 'dart:math' as math;
 import 'package:drobe/utils/image_utils.dart';
 import 'package:hive/hive.dart';
 import 'package:drobe/models/item.dart';
-import 'package:drobe/services/outfitStorage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:drobe/services/hiveServiceManager.dart';
 import 'package:drobe/settings/profile.dart';
-
+import 'package:drobe/models/outfit.dart';
 
 class CreateOutfitPage extends StatefulWidget {
   final List<Color> colorPalette;
   final List<Outfit> savedOutfits;
   final DateTime selectedDate;
-
 
   const CreateOutfitPage({
     super.key,
@@ -35,6 +32,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
   late DateTime selectedDate;
   final TextEditingController _outfitNameController = TextEditingController();
   bool _isGenerating = false;
+  bool _isSaving = false; // Add flag to prevent double-saving
 
   // Store color tiles from the chosen palette
   late List<ColorTile> _paletteTiles;
@@ -64,6 +62,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
 
   // Determine if the "Save" FAB is enabled
   bool get canSave {
+    if (_isSaving || _isGenerating) return false;
     final hasName = _outfitNameController.text.trim().isNotEmpty;
     final hasAtLeastOneClothing =
     chosenClothes.values.any((url) => (url != null && url.isNotEmpty));
@@ -118,18 +117,24 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
             TextField(
               controller: _outfitNameController,
               style: const TextStyle(
-                fontSize: 14, // 👈 Smaller font size
+                fontSize: 14,
               ),
               decoration: const InputDecoration(
                 labelText: 'OUTFIT NAME',
                 labelStyle: TextStyle(
-                  fontSize: 15, // 👈 Optional: smaller label too
+                  fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
                 border: OutlineInputBorder(),
               ),
-              onChanged: (_) {
-                setState(() {});
+              // Remove the onChanged handler that updates state continuously
+              // Only update when the user presses done on the keyboard
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                // This will be called when the user presses done on the keyboard
+                setState(() {
+                  // Update state to refresh the UI if needed
+                });
               },
             ),
 
@@ -497,7 +502,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         children: [
           FloatingActionButton.extended(
             heroTag: 'generate_fab',
-            onPressed: _isGenerating ? null : _generateOutfit,
+            onPressed: _isGenerating || _isSaving ? null : _generateOutfit,
             label: _isGenerating
                 ? const Text('GENERATING...')
                 : const Text('GENERATE'),
@@ -514,7 +519,16 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
             backgroundColor: Colors.grey[300], // ✅ Light Grey (matches avatar)
             foregroundColor: Colors.black, // ✅ Black icon color
             shape: const CircleBorder(), // ✅ Ensures a perfect circle
-            child: const Icon(Icons.check, size: 28), // ✅ Same icon & size as avatar
+            child: _isSaving
+                ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                color: Colors.black,
+                strokeWidth: 2,
+              ),
+            )
+                : const Icon(Icons.check, size: 28), // ✅ Same icon & size as avatar
           ),
         ],
       ),
@@ -971,7 +985,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
   // Helper method to get items for a specific category
   Future<List<Item>> _getItemsForCategory(String category) async {
     try {
-      final itemsBox = await HiveManager().getBox(ITEMS_BOX_NAME);
+      final itemsBox = await HiveManager().getBox('itemsBox');
 
       // Handle singular/plural mismatches
       String categoryToMatch = category.toLowerCase();
@@ -989,6 +1003,13 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
           .whereType<Item>() // Use whereType instead of cast
           .where((item) {
         String itemCategory = item.category.toLowerCase();
+
+        // Filter out items that are in laundry during automatic generation
+        if (item.inLaundry) {
+          print('Skipping item ${item.name} because it is in laundry');
+          return false;
+        }
+
         return itemCategory == dbCategory;
       })
           .toList();
@@ -1014,8 +1035,9 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
       if (accessories.isEmpty) return;
 
       // Filter out accessories that are already in the current outfit
+      // AND filter out accessories that are in laundry
       final availableAccessories = accessories.where((item) =>
-      !_currentOutfitAccessoryIds.contains(item.id)).toList();
+      !_currentOutfitAccessoryIds.contains(item.id) && !item.inLaundry).toList();
 
       if (availableAccessories.isEmpty) {
         print('No more unique accessories available');
@@ -1064,7 +1086,7 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
     }
   }
 
-  // Helper method to select a random accessory from a list
+// Modify the _selectRandomAccessoryFromList method to ensure we're only using clean items
   void _selectRandomAccessoryFromList(List<Item> accessories, Set<String> selectedAccessoryUrls) async {
     int attempts = 0;
     bool foundNewAccessory = false;
@@ -1075,6 +1097,13 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
       // Select a random accessory
       final random = math.Random();
       final selectedItem = accessories[random.nextInt(accessories.length)];
+
+      // Double-check it's not in laundry (should already be filtered, but just to be safe)
+      if (selectedItem.inLaundry) {
+        print('Skipping ${selectedItem.name} because it is in laundry');
+        continue;
+      }
+
       final newAccessoryUrl = selectedItem.imageUrl;
 
       // Check if this accessory is already selected
@@ -1162,19 +1191,31 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
   void _saveOutfit() async {
     if (!canSave) return;
 
+    // Prevent multiple saves
+    setState(() {
+      _isSaving = true;
+    });
+
     try {
       // Create a list to track all image paths for verification
       List<String> imagePaths = [];
 
       // Process and verify all clothing image paths in the outfit
-      Map<String, String> verifiedClothes = {};
-      for (final entry in chosenClothes.entries) {
-        if (entry.value != null && entry.value!.isNotEmpty) {
-          final imagePath = await _ensureProperImagePath(entry.value);
+      Map<String, String?> verifiedClothes = {};
+
+      // Ensure all standard categories are included in the outfit, even if empty
+      final standardCategories = ['LAYER', 'SHIRT', 'BOTTOMS', 'SHOES'];
+      for (final category in standardCategories) {
+        final value = chosenClothes[category];
+        if (value != null && value.isNotEmpty) {
+          final imagePath = await _ensureProperImagePath(value);
           if (imagePath != null) {
-            verifiedClothes[entry.key] = imagePath;
+            verifiedClothes[category] = imagePath;
             imagePaths.add(imagePath);
           }
+        } else {
+          // Include the category with null value to ensure it appears in the outfit
+          verifiedClothes[category] = null;
         }
       }
 
@@ -1208,28 +1249,28 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
         accessories: verifiedAccessories,
         date: selectedDate,
         colorPalette: widget.colorPalette,
-        // Note: assuming ID is handled internally or in the storage service
+        // Note: ID will be generated by the OutfitStorageService
       );
 
-      // Save using the storage service
-      await OutfitStorageService.saveOutfit(newOutfit);
-
-      // Show success message
+      // Return the outfit to the previous screen instead of saving it here
+      // This prevents double-saving since the calling screen will handle the save
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Outfit saved successfully!')),
-        );
-
-        // Return to previous screen
-        Navigator.pop(context, newOutfit);
+        // Return to previous screen with the outfit data and the selected date
+        Navigator.pop(context, {
+          'outfit': newOutfit,
+          'date': selectedDate,
+        });
       }
     } catch (e) {
       // Show error message
-      print('Error saving outfit: $e');
+      print('Error preparing outfit: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save outfit: ${e.toString()}')),
+          SnackBar(content: Text('Failed to prepare outfit: ${e.toString()}')),
         );
+        setState(() {
+          _isSaving = false;
+        });
       }
     }
   }
@@ -1297,5 +1338,18 @@ class _CreateOutfitPageState extends State<CreateOutfitPage> {
 class ColorTile {
   final Color color;
   ColorTile({required this.color});
+}
+
+// Helper function to convert stored relative paths to absolute paths.
+Future<String> getAbsoluteImagePath(String storedPath) async {
+  final directory = await getApplicationDocumentsDirectory();
+  if (storedPath.contains('/Documents/')) {
+    const docsKeyword = '/Documents/';
+    final index = storedPath.indexOf(docsKeyword);
+    final relativePath = storedPath.substring(index + docsKeyword.length);
+    return path.join(directory.path, relativePath);
+  } else {
+    return path.join(directory.path, storedPath);
+  }
 }
 
