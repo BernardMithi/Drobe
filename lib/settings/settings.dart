@@ -6,6 +6,7 @@ import 'package:drobe/settings/term.dart';
 import 'package:drobe/settings/contactUs.dart';
 import 'package:drobe/settings/notifications.dart';
 import 'package:drobe/settings/helpCenter.dart';
+import 'package:drobe/settings/profileAvatar.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -18,6 +19,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final AuthService _authService = AuthService();
   bool _isLoading = false;
   Map<String, String> _userData = {};
+  Key _avatarKey = ValueKey('settings_avatar_${DateTime.now().millisecondsSinceEpoch}');
 
   @override
   void initState() {
@@ -61,6 +63,12 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _refreshAvatar() {
+    setState(() {
+      _avatarKey = ValueKey('settings_avatar_${DateTime.now().millisecondsSinceEpoch}');
+    });
+  }
+
   Future<void> _logout() async {
     setState(() {
       _isLoading = true;
@@ -85,17 +93,19 @@ class _SettingsPageState extends State<SettingsPage> {
   List<SettingsItem> get _settingsItems => [
     SettingsItem(
       icon: Icons.person,
-      iconColor: Colors.blue,
-      title: 'Profile',
+      title: 'PROFILE',
       subtitle: 'Manage your account information',
       onTap: () {
-        Navigator.of(context).pushNamed('/settings/profile');
+        Navigator.of(context).pushNamed('/settings/profile').then((_) {
+          // Refresh when returning from profile page
+          _refreshAvatar();
+          _loadUserData();
+        });
       },
     ),
     SettingsItem(
       icon: Icons.notifications_none,
-      iconColor: Colors.amber,
-      title: 'Notifications',
+      title: 'NOTIFICATIONS',
       subtitle: 'Manage outfit and laundry reminders',
       onTap: () {
         Navigator.of(context).push(
@@ -107,8 +117,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
     SettingsItem(
       icon: Icons.privacy_tip,
-      iconColor: Colors.green,
-      title: 'Privacy',
+      title: 'PRIVACY',
       subtitle: 'View privacy policy',
       onTap: () {
         Navigator.of(context).push(
@@ -120,8 +129,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
     SettingsItem(
       icon: Icons.description,
-      iconColor: Colors.purple,
-      title: 'Terms of Service',
+      title: 'TERMS OF SERVICE',
       subtitle: 'View terms of service',
       onTap: () {
         Navigator.of(context).push(
@@ -133,8 +141,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
     SettingsItem(
       icon: Icons.lock_outline,
-      iconColor: Colors.orange,
-      title: 'Change Password',
+      title: 'CHANGE PASSWORD',
       subtitle: 'Update your password',
       onTap: () {
         Navigator.of(context).push(
@@ -146,8 +153,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
     SettingsItem(
       icon: Icons.help,
-      iconColor: Colors.teal,
-      title: 'Help & Support',
+      title: 'HELP & SUPPORT',
       subtitle: 'Get help with the app',
       onTap: () {
         Navigator.of(context).push(
@@ -159,21 +165,19 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
     SettingsItem(
       icon: Icons.mail_outline,
-      iconColor: Colors.blue,
-      title: 'Contact Us',
+      title: 'CONTACT US',
       subtitle: 'Get in touch with our team',
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => const ContactUsPage(),
+            builder: (context) => ContactUsPage(),
           ),
         );
       },
     ),
     SettingsItem(
       icon: Icons.info,
-      iconColor: Colors.indigo,
-      title: 'About',
+      title: 'ABOUT',
       subtitle: 'App information and version',
       onTap: () {
         _showAboutDialog(context);
@@ -186,10 +190,36 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('SETTINGS'),
+        title: const Text(
+            'SETTINGS',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
+        ),
+        centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
+        actions: [
+          // Profile picture in the app bar
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).pushNamed('/settings/profile').then((_) {
+                  // Refresh when returning from profile page
+                  _refreshAvatar();
+                  _loadUserData();
+                });
+              },
+              child: ProfileAvatar(
+                key: _avatarKey,
+                size: 42,
+                userId: _userData['id'] ?? '',
+                name: _userData['name'] ?? '',
+                email: _userData['email'] ?? '',
+              ),
+            ),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -201,7 +231,6 @@ class _SettingsPageState extends State<SettingsPage> {
           // Settings Items
           ..._settingsItems.map((item) => _buildSettingsTile(
             icon: item.icon,
-            iconColor: item.iconColor,
             title: item.title,
             subtitle: item.subtitle,
             onTap: item.onTap,
@@ -217,47 +246,37 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildSettingsTile({
     required IconData icon,
-    required Color iconColor,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
   }) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
+                Icon(
                     icon,
-                    color: iconColor,
-                    size: 20,
-                  ),
+                    size: 24,
+                    color: Colors.grey[800]
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -266,10 +285,11 @@ class _SettingsPageState extends State<SettingsPage> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Avenir',
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -277,16 +297,17 @@ class _SettingsPageState extends State<SettingsPage> {
                         subtitle,
                         style: TextStyle(
                           fontFamily: 'Avenir',
-                          fontSize: 14,
+                          fontSize: 12,
                           color: Colors.grey[600],
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right,
-                  color: Colors.grey,
+                  size: 20,
+                  color: Colors.grey[400],
                 ),
               ],
             ),
@@ -323,14 +344,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
 class SettingsItem {
   final IconData icon;
-  final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
   SettingsItem({
     required this.icon,
-    required this.iconColor,
     required this.title,
     required this.subtitle,
     required this.onTap,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:drobe/services/notificationService.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({Key? key}) : super(key: key);
@@ -21,11 +22,52 @@ class _NotificationsPageState extends State<NotificationsPage> {
   String _laundryReminderTime = '10:00 AM';
 
   bool _isLoading = true;
+  final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
+    _initializeNotifications();
     _loadSettings();
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      debugPrint('Initializing notifications...');
+      final bool success = await _notificationService.init();
+
+      if (success) {
+        debugPrint('Notifications initialized successfully');
+      } else {
+        debugPrint('Failed to initialize notifications');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initialize notifications. Some features may not work.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error initializing notifications: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error initializing notifications: $e'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -54,6 +96,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+// Modify the _saveSettings method to provide better feedback
   Future<void> _saveSettings() async {
     setState(() {
       _isLoading = true;
@@ -73,24 +116,51 @@ class _NotificationsPageState extends State<NotificationsPage> {
       await prefs.setString('laundry_reminder_day', _laundryReminderDay);
       await prefs.setString('laundry_reminder_time', _laundryReminderTime);
 
+      // Check if notifications are initialized before proceeding
+      if (!_notificationService.isInitialized) {
+        // Try to initialize again
+        final bool success = await _notificationService.init();
+        if (!success) {
+          throw Exception('Notifications service could not be initialized');
+        }
+      }
+
       if (_pushNotifications) {
+        // Handle outfit reminders
         if (_outfitReminders) {
-          _scheduleOutfitReminders();
+          final outfitSuccess = await _scheduleOutfitReminders();
+          if (outfitSuccess) {
+            debugPrint('Outfit reminders scheduled successfully for $_outfitReminderTime');
+          } else {
+            debugPrint('Failed to schedule outfit reminders');
+          }
         } else {
-          _cancelOutfitReminders();
+          await _cancelOutfitReminders();
+          debugPrint('Outfit reminders cancelled');
         }
 
+        // Handle laundry reminders
         if (_laundryReminders) {
-          _scheduleLaundryReminders();
+          final laundrySuccess = await _scheduleLaundryReminders();
+          if (laundrySuccess) {
+            debugPrint('Laundry reminders scheduled successfully for $_laundryReminderDay at $_laundryReminderTime');
+          } else {
+            debugPrint('Failed to schedule laundry reminders');
+          }
         } else {
-          _cancelLaundryReminders();
+          await _cancelLaundryReminders();
+          debugPrint('Laundry reminders cancelled');
         }
       } else {
-        _cancelAllReminders();
+        await _cancelAllReminders();
+        debugPrint('All reminders cancelled (push notifications disabled)');
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification settings saved')),
+        SnackBar(
+          content: Text(_getSuccessMessage()),
+          duration: const Duration(seconds: 3),
+        ),
       );
 
       setState(() {
@@ -105,29 +175,63 @@ class _NotificationsPageState extends State<NotificationsPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save notification settings')),
+        SnackBar(content: Text('Failed to save notification settings: $e')),
       );
     }
   }
 
-  void _scheduleOutfitReminders() {
-    debugPrint('Scheduling outfit reminders for $_outfitReminderTime daily');
+// Add a method to generate a more informative success message
+  String _getSuccessMessage() {
+    if (!_pushNotifications) {
+      return 'Notification settings saved. Push notifications are disabled.';
+    }
+
+    List<String> enabledNotifications = [];
+
+    if (_outfitReminders) {
+      enabledNotifications.add('outfit reminders at $_outfitReminderTime');
+    }
+
+    if (_laundryReminders) {
+      enabledNotifications.add('laundry reminders on $_laundryReminderDay at $_laundryReminderTime');
+    }
+
+    if (enabledNotifications.isEmpty) {
+      return 'Notification settings saved. No reminders are enabled.';
+    }
+
+    return 'Notification settings saved. Scheduled: ${enabledNotifications.join(', ')}.';
   }
 
-  void _scheduleLaundryReminders() {
-    debugPrint('Scheduling laundry reminders for $_laundryReminderDay at $_laundryReminderTime');
+  Future<bool> _scheduleOutfitReminders() async {
+    final success = await _notificationService.scheduleOutfitReminder(_outfitReminderTime);
+    if (!success) {
+      debugPrint('Failed to schedule outfit reminders');
+    }
+    return success;
   }
 
-  void _cancelOutfitReminders() {
-    debugPrint('Cancelling outfit reminders');
+  Future<bool> _scheduleLaundryReminders() async {
+    final success = await _notificationService.scheduleLaundryReminder(
+        _laundryReminderDay,
+        _laundryReminderTime
+    );
+    if (!success) {
+      debugPrint('Failed to schedule laundry reminders');
+    }
+    return success;
   }
 
-  void _cancelLaundryReminders() {
-    debugPrint('Cancelling laundry reminders');
+  Future<void> _cancelOutfitReminders() async {
+    await _notificationService.cancelOutfitReminders();
   }
 
-  void _cancelAllReminders() {
-    debugPrint('Cancelling all reminders');
+  Future<void> _cancelLaundryReminders() async {
+    await _notificationService.cancelLaundryReminders();
+  }
+
+  Future<void> _cancelAllReminders() async {
+    await _notificationService.cancelAllReminders();
   }
 
   @override
@@ -225,6 +329,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 ],
             ],
           ),
+
+
         ],
       ),
       bottomNavigationBar: _isLoading
@@ -448,6 +554,28 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
+  TimeOfDay _parseTimeString(String timeString) {
+    final parts = timeString.split(' ');
+    final timeParts = parts[0].split(':');
+    int hour = int.parse(timeParts[0]);
+    final int minute = int.parse(timeParts[1]);
+
+    if (parts[1] == 'PM' && hour < 12) {
+      hour += 12;
+    } else if (parts[1] == 'AM' && hour == 12) {
+      hour = 0;
+    }
+
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _formatTimeOfDay(TimeOfDay timeOfDay) {
+    final hour = timeOfDay.hourOfPeriod == 0 ? 12 : timeOfDay.hourOfPeriod;
+    final minute = timeOfDay.minute.toString().padLeft(2, '0');
+    final period = timeOfDay.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
   void _showOutfitTimePicker() async {
     final TimeOfDay initialTime = _parseTimeString(_outfitReminderTime);
     final TimeOfDay? selectedTime = await showTimePicker(
@@ -531,28 +659,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _laundryReminderDay = selectedDay;
       });
     }
-  }
-
-  TimeOfDay _parseTimeString(String timeString) {
-    final parts = timeString.split(' ');
-    final timeParts = parts[0].split(':');
-    int hour = int.parse(timeParts[0]);
-    final int minute = int.parse(timeParts[1]);
-
-    if (parts[1] == 'PM' && hour < 12) {
-      hour += 12;
-    } else if (parts[1] == 'AM' && hour == 12) {
-      hour = 0;
-    }
-
-    return TimeOfDay(hour: hour, minute: minute);
-  }
-
-    String _formatTimeOfDay(TimeOfDay timeOfDay) {
-    final hour = timeOfDay.hourOfPeriod == 0 ? 12 : timeOfDay.hourOfPeriod;
-    final minute = timeOfDay.minute.toString().padLeft(2, '0');
-    final period = timeOfDay.period == DayPeriod.am ? 'AM' : 'PM';
-    return '$hour:$minute $period';
   }
 }
 

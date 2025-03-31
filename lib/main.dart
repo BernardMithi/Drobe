@@ -27,6 +27,7 @@ import 'package:drobe/weather_service.dart';
 import 'package:drobe/Fabrics/fabricTips.dart';
 import 'package:drobe/theme/app_theme.dart';
 import 'package:drobe/settings/profileAvatar.dart';
+import 'package:drobe/services/notificationService.dart'; // Add this import for notifications
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -74,6 +75,9 @@ Future<void> initializeApp() async {
     // Initialize AuthService (now using Hive)
     await AuthService().initialize();
 
+    // Initialize NotificationService
+    await NotificationService().init();
+
     // Create a demo user if needed
     await AuthService().createDemoUserIfNeeded();
 
@@ -87,6 +91,14 @@ Future<void> initializeApp() async {
     await HiveManager().init();
     await OutfitStorageService.init();
     await AuthService().initialize();
+
+    // Try to initialize notification service again
+    try {
+      await NotificationService().init();
+    } catch (notificationError) {
+      debugPrint('Failed to initialize notifications after recovery: $notificationError');
+      // Continue without notifications if they fail
+    }
   }
 }
 
@@ -108,6 +120,17 @@ void main() async {
     // Initialize AuthService and wait for it to complete
     final authService = AuthService();
     final authInitialized = await authService.initialize();
+
+    // Initialize NotificationService
+    final notificationService = NotificationService();
+    final notificationInitialized = await notificationService.init();
+
+    if (!notificationInitialized) {
+      debugPrint('Warning: NotificationService initialization failed');
+      // We'll continue anyway and let the UI handle this gracefully
+    } else {
+      debugPrint('NotificationService initialized successfully');
+    }
 
     if (!authInitialized) {
       debugPrint('Warning: AuthService initialization failed');
@@ -150,6 +173,7 @@ void main() async {
                     await HiveManager().init();
                     await OutfitStorageService.init();
                     await AuthService().initialize();
+                    await NotificationService().init(); // Add notification initialization here
 
                     // Run the app
                     runApp(const MyApp());
@@ -208,6 +232,9 @@ class _AppStartupHandlerState extends State<AppStartupHandler> {
 
       // Try to initialize AuthService
       final success = await AuthService().initialize();
+
+      // Also initialize NotificationService
+      await NotificationService().init();
 
       if (mounted) {
         setState(() {
@@ -444,7 +471,7 @@ class _HomepageState extends State<Homepage> with RouteAware {
             decoration: BoxDecoration(
               image: DecorationImage(
                 image: const NetworkImage(
-                  'https://images.unsplash.com/photo-1524275539700-cf51138f679b?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDF8fHxlbnwwfHx8fHw%3D',
+                  'https://images.unsplash.com/photo-1524275539700-cf51138f679b?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDF8fHw%3D',
                 ),
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(

@@ -170,8 +170,15 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.category.toUpperCase(),
-            style: const TextStyle(fontFamily: 'Avenir')),
+        title: Text(
+            widget.category.toUpperCase(),
+            style: const TextStyle(
+                fontFamily: 'Avenir',
+                fontSize: 18,
+                fontWeight: FontWeight.bold
+            )
+        ),
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -275,3 +282,4 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
     );
   }
 }
+

@@ -232,53 +232,6 @@ class _ContactUsPageState extends State<ContactUsPage> {
               const SizedBox(height: 24),
 
               // Alternative Contact Methods Card
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Other ways to reach us:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    _buildContactMethod(
-                      icon: Icons.email_outlined,
-                      title: 'Email',
-                      detail: 'support@outfitplanner.com',
-                    ),
-
-                    _buildContactMethod(
-                      icon: Icons.phone_outlined,
-                      title: 'Phone',
-                      detail: '+1 (555) 123-4567',
-                    ),
-
-                    _buildContactMethod(
-                      icon: Icons.headset_mic_outlined,
-                      title: 'Live Chat',
-                      detail: 'Available 9AM - 5PM ET, Monday to Friday',
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
