@@ -28,6 +28,9 @@ class Item extends HiveObject {
   @HiveField(7)
   bool inLaundry; // ✅ Indicates if the item is in laundry
 
+  @HiveField(8)
+  final String? userId;
+
   Item({
     required this.id,
     required this.imageUrl,
@@ -37,6 +40,7 @@ class Item extends HiveObject {
     required this.category,
     this.wearCount = 0,
     this.inLaundry = false,
+    this.userId,
   });
 
   // ✅ Dynamically determine wear status based on conditions
@@ -73,6 +77,7 @@ class Item extends HiveObject {
     String? category,
     int? wearCount,
     bool? inLaundry,
+    String? userId,
   }) {
     return Item(
       id: id ?? this.id,
@@ -83,6 +88,8 @@ class Item extends HiveObject {
       category: category ?? this.category,
       wearCount: wearCount ?? this.wearCount,
       inLaundry: inLaundry ?? this.inLaundry,
+      userId: userId ?? this.userId,
     );
   }
 }
+

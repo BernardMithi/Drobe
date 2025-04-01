@@ -11,6 +11,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:drobe/services/hiveServiceManager.dart';
 import 'package:drobe/settings/profile.dart';
+import 'package:drobe/auth/authService.dart';
 
 class CreatePalettePage extends StatefulWidget {
   final DateTime selectedDate;
@@ -27,14 +28,34 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   bool _isLoading = true;
   List<ColorTile> _wardrobeColors = []; // To store all wardrobe colors
   bool _useGreyPalette = false; // Only use grey when needed
+  String? _currentUserId;
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
     super.initState();
     selectedDate = widget.selectedDate;
-    _checkItemsExistence();
+    _getCurrentUserId();
     print('InitState: Loading wardrobe colors...');
-    _loadWardrobeColors();
+  }
+
+  // Get current user ID
+  Future<void> _getCurrentUserId() async {
+    try {
+      final userData = await _authService.getCurrentUser();
+      final userId = userData['id'];
+      setState(() {
+        _currentUserId = userId;
+      });
+      print('Current user ID: $_currentUserId');
+      _checkItemsExistence();
+      _loadWardrobeColors();
+    } catch (e) {
+      print('Error getting current user ID: $e');
+      // Still try to load colors, but they won't be filtered by user
+      _checkItemsExistence();
+      _loadWardrobeColors();
+    }
   }
 
   // Initial palette with shades of grey only
@@ -100,6 +121,12 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         try {
           final item = itemsBox.get(key);
           if (item != null && item is Item) {
+            // Filter by user ID if available
+            if (_currentUserId != null && item.userId != null && item.userId != _currentUserId) {
+              print('Skipping item ${item.name} - belongs to user ${item.userId}, not $_currentUserId');
+              continue;
+            }
+
             items.add(item);
             print('Added item: ${item.name}, Has colors: ${item.colors != null}');
             if (item.colors != null) {
@@ -120,7 +147,15 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                   category: item['category'] as String? ?? 'uncategorized',
                   wearCount: item['wearCount'] as int? ?? 0,
                   inLaundry: item['inLaundry'] as bool? ?? false,
+                  userId: item['userId'] as String? ?? _currentUserId,
                 );
+
+                // Filter by user ID if available
+                if (_currentUserId != null && convertedItem.userId != null &&
+                    convertedItem.userId != _currentUserId) {
+                  continue;
+                }
+
                 items.add(convertedItem);
                 print('Successfully converted map to Item: ${convertedItem.name}');
               } catch (e) {
@@ -152,13 +187,6 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         // Reset palette to grey shades
         _resetToGreyPalette();
         _useGreyPalette = true;
-
-        // Show notification to user after UI is built
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _showGreyPaletteNotification("Using grayscale palette because your wardrobe is empty.");
-          }
-        });
       }
 
       // Process colors
@@ -185,7 +213,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
               try {
                 colorMap[colorWithAlpha] = ColorTile(
                     color: Color(colorWithAlpha),
-                    itemName: item.name
+
                 );
                 print('Added color: 0x${colorWithAlpha.toRadixString(16)} from ${item.name}');
               } catch (e) {
@@ -479,6 +507,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                               'clothes': result.clothes ?? <String, String?>{},
                               'accessories': result.accessories ?? <String>[],
                               'colorPalette': chosenColors,
+                              'userId': _currentUserId, // Add user ID to the outfit
                             };
                           }
 
@@ -543,6 +572,22 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
               },
             ),
 
+            // Display item name if available
+            if (tile.itemName != null && tile.itemName!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  tile.itemName!,
+                  style: TextStyle(
+                    color: iconColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
           ],
         ),
       ),
@@ -576,34 +621,44 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: colorsToShow.map((colorTile) {
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _palette[i] = ColorTile(
-                          color: colorTile.color,
-                          isLocked: _palette[i].isLocked,
-                          itemName: colorTile.itemName,
-                        );
-                      });
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: colorTile.color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.black12,
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: colorsToShow.map((colorTile) {
+                      return Tooltip(
+                        message: colorTile.itemName ?? '',
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _palette[i] = ColorTile(
+                                color: colorTile.color,
+                                isLocked: _palette[i].isLocked,
+                                itemName: colorTile.itemName,
+                              );
+                            });
+                            Navigator.pop(context);
+                          },
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: colorTile.color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.black12,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               TextButton(
@@ -624,7 +679,6 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
     // Only use grey palette if there are no wardrobe colors
     if (_wardrobeColors.isEmpty) {
-      print('No wardrobe colors available, using grey shades');
       setState(() {
         List<Color> greyShades = _getGreyShades();
         greyShades.shuffle(); // Randomize the order
@@ -674,13 +728,11 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   }
 }
 
-
 Future<void> _checkItemsExistence() async {
   try {
     final itemsBox = await HiveManager().getBox('itemsBox');
     print('Items box exists: ${itemsBox != null}');
     print('Items count: ${itemsBox.length}');
-
 
     // List all keys in the box
     print('Item keys: ${itemsBox.keys.toList()}');

@@ -23,13 +23,14 @@ class OutfitAdapter extends TypeAdapter<Outfit> {
       accessories: (fields[4] as List).cast<dynamic>(),
       date: fields[2] as DateTime,
       colorPaletteStrings: (fields[6] as List?)?.cast<String>(),
+      userId: fields[7] as String?,
     )..colorCodes = (fields[5] as List).cast<int>();
   }
 
   @override
   void write(BinaryWriter writer, Outfit obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -43,7 +44,9 @@ class OutfitAdapter extends TypeAdapter<Outfit> {
       ..writeByte(5)
       ..write(obj.colorCodes)
       ..writeByte(6)
-      ..write(obj.colorPaletteStrings);
+      ..write(obj.colorPaletteStrings)
+      ..writeByte(7)
+      ..write(obj.userId);
   }
 
   @override

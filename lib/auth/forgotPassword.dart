@@ -5,53 +5,112 @@ class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({Key? key}) : super(key: key);
 
   @override
-  _ForgotPasswordPageState createState() => _ForgotPasswordPageState();
+  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
-  bool _emailSent = false;
-  final AuthService _authService = AuthService();
-
-  @override
-  void initState() {
-    super.initState();
-    // Check if AuthService is initialized
-    _authService.ensureInitialized();
-  }
+  String _errorMessage = '';
+  String _successMessage = '';
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _emailVerified = false;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _resetPassword() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+  // Step 1: Verify email exists
+  Future<void> _verifyEmail() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      debugPrint('Attempting to send password reset email to: ${_emailController.text.trim()}');
-      final success = await _authService.sendPasswordResetEmail(
-        _emailController.text.trim(),
-      );
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+      _successMessage = '';
+    });
 
-      debugPrint('Password reset email result: $success');
+    try {
+      final email = _emailController.text.trim();
 
+      // Check if the email exists in the system
+      final userExists = await AuthService().checkEmailExists(email);
+
+      if (userExists) {
+        // Email exists, proceed to password reset
+        setState(() {
+          _isLoading = false;
+          _emailVerified = true;
+        });
+      } else {
+        // Email not found
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No account found with this email address.';
+        });
+      }
+    } catch (e) {
       setState(() {
         _isLoading = false;
-        _emailSent = success;
+        _errorMessage = 'An error occurred. Please try again.';
       });
+    }
+  }
 
-      if (!success && mounted) {
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send reset email')),
-        );
+  // Step 2: Reset password
+  Future<void> _resetPassword() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+      _successMessage = '';
+    });
+
+    try {
+      final email = _emailController.text.trim();
+      final newPassword = _newPasswordController.text;
+
+      // Reset the password
+      final success = await AuthService().resetPassword(email, newPassword);
+
+      if (success) {
+        // Password reset successful
+        setState(() {
+          _isLoading = false;
+          _successMessage = 'Password reset successful! You can now log in with your new password.';
+        });
+
+        // Navigate back to login after a short delay
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/login');
+          }
+        });
+      } else {
+        // Password reset failed
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to reset password. Please try again.';
+        });
       }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'An error occurred. Please try again.';
+      });
     }
   }
 
@@ -59,168 +118,204 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reset Password'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        title: const Text('RESET PASSWORD'),
       ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: _emailSent
-                ? _buildSuccessMessage()
-                : _buildResetForm(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildResetForm() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // App logo
-          Center(
-            child: Image.asset(
-              'assets/images/drobe_logo.png',
-              height: 80,
-              fit: BoxFit.contain,
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          const Text(
-            'Forgot your password?',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          const Text(
-            'Enter your email address and we\'ll send you a link to reset your password.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // Email field
-          TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.email),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your email';
-              }
-              if (!value.contains('@')) {
-                return 'Please enter a valid email';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 24),
-
-          // Reset button
-          ElevatedButton(
-            onPressed: _isLoading ? null : _resetPassword,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              backgroundColor: Colors.black,
-            ),
-            child: _isLoading
-                ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 20),
+              // Logo
+              Center(
+                child: Image.asset(
+                  'assets/images/drobe_logo.png',
+                  height: 200,
+                  fit: BoxFit.contain,
+                ),
               ),
-            )
-                : const Text('Reset Password'),
-          ),
-          const SizedBox(height: 16),
+              const SizedBox(height: 100),
 
-          // Back to login link
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('Back to Login'),
+              // Step 1: Email verification
+              if (!_emailVerified) ...[
+                const Text(
+                  'Enter your email address to reset your password.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+
+                // Email field
+                TextFormField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your email';
+                    }
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      return 'Please enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Verify Email button
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _verifyEmail,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                      : const Text('CONTINUE'),
+                ),
+              ],
+
+              // Step 2: Password reset
+              if (_emailVerified) ...[
+                Text(
+                  'Enter a new password for ${_emailController.text}',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+
+                // New password field
+                TextFormField(
+                  controller: _newPasswordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a new password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Confirm password field
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your new password';
+                    }
+                    if (value != _newPasswordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Reset Password button
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _resetPassword,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                      : const Text('RESET PASSWORD'),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              // Error message
+              if (_errorMessage.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.red.shade100,
+                  child: Text(
+                    _errorMessage,
+                    style: TextStyle(color: Colors.red.shade800),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+
+              // Success message
+              if (_successMessage.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.green.shade100,
+                  child: Text(
+                    _successMessage,
+                    style: TextStyle(color: Colors.green.shade800),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+
+              const SizedBox(height: 16),
+
+              // Back to login link
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pushReplacementNamed(context, '/login');
+                  },
+                  child: const Text('Back to Login'),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildSuccessMessage() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // App logo
-        Center(
-          child: Image.asset(
-            'assets/images/drobe_logo.png',
-            height: 80,
-            fit: BoxFit.contain,
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        const Icon(
-          Icons.check_circle_outline,
-          size: 64,
-          color: Colors.green,
-        ),
-        const SizedBox(height: 24),
-
-        const Text(
-          'Email Sent!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        Text(
-          'We\'ve sent a password reset link to ${_emailController.text}',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 16,
-            color: Colors.grey,
-          ),
-        ),
-        const SizedBox(height: 32),
-
-        // Back to login button
-        ElevatedButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            backgroundColor: Colors.black,
-          ),
-          child: const Text('Back to Login'),
-        ),
-      ],
     );
   }
 }

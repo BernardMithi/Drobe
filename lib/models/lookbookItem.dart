@@ -30,6 +30,9 @@ class LookbookItem extends HiveObject {
   @HiveField(7)
   List<int> colorCodes = [];
 
+  @HiveField(8)
+  String? userId;  // New field to track which user owns this lookbook item
+
   // Non-persisted field, computed from colorCodes
   List<Color> get colorPalette => colorCodes.map((code) => Color(code)).toList();
 
@@ -42,6 +45,7 @@ class LookbookItem extends HiveObject {
     this.notes,
     this.source,
     List<Color>? colorPalette,
+    this.userId,  // Add to constructor
   }) :
         tags = tags ?? [],
         colorCodes = colorPalette?.map((color) => color.value).toList() ?? [];
@@ -56,6 +60,7 @@ class LookbookItem extends HiveObject {
     String? notes,
     String? source,
     List<Color>? colorPalette,
+    String? userId,  // Add to copyWith
   }) {
     return LookbookItem(
       id: id ?? this.id,
@@ -66,6 +71,7 @@ class LookbookItem extends HiveObject {
       notes: notes ?? this.notes,
       source: source ?? this.source,
       colorPalette: colorPalette ?? this.colorPalette,
+      userId: userId ?? this.userId,  // Include in copyWith
     );
   }
 
@@ -83,6 +89,7 @@ class LookbookItem extends HiveObject {
         notes: map['notes'] as String?,
         source: map['source'] as String?,
         colorPalette: (map['colorCodes'] as List?)?.map((code) => Color(code as int)).toList(),
+        userId: map['userId'] as String?,  // Add to fromMap
       );
     } catch (e) {
       debugPrint('Error creating LookbookItem from map: $e');
@@ -105,11 +112,13 @@ class LookbookItem extends HiveObject {
       'notes': notes,
       'source': source,
       'colorCodes': colorCodes,
+      'userId': userId,  // Add to toMap
     };
   }
 
   @override
   String toString() {
-    return 'LookbookItem(id: $id, name: $name, tags: $tags)';
+    return 'LookbookItem(id: $id, name: $name, tags: $tags, userId: $userId)';
   }
 }
+

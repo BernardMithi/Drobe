@@ -24,13 +24,14 @@ class LookbookItemAdapter extends TypeAdapter<LookbookItem> {
       tags: (fields[4] as List?)?.cast<String>(),
       notes: fields[5] as String?,
       source: fields[6] as String?,
+      userId: fields[8] as String?,
     )..colorCodes = (fields[7] as List).cast<int>();
   }
 
   @override
   void write(BinaryWriter writer, LookbookItem obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -46,7 +47,9 @@ class LookbookItemAdapter extends TypeAdapter<LookbookItem> {
       ..writeByte(6)
       ..write(obj.source)
       ..writeByte(7)
-      ..write(obj.colorCodes);
+      ..write(obj.colorCodes)
+      ..writeByte(8)
+      ..write(obj.userId);
   }
 
   @override

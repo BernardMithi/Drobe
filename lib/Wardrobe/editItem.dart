@@ -10,6 +10,7 @@ import 'package:image/image.dart' as img;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:drobe/utils/image_utils.dart';
+import 'package:drobe/auth/authService.dart';
 
 class EditItemPage extends StatefulWidget {
   final int itemIndex;
@@ -24,10 +25,12 @@ class _EditItemPageState extends State<EditItemPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _imageUrlController = TextEditingController();
+  final AuthService _authService = AuthService();
 
   File? _selectedImage;
   String? _imageUrl;
   late Item item;
+  String? _currentUserId;
 
   late Box itemsBox;
   List<int> _selectedColors = []; // Stores selected colors (Max 5)
@@ -37,6 +40,15 @@ class _EditItemPageState extends State<EditItemPage> {
     super.initState();
     itemsBox = Hive.box('itemsBox');
     _loadItem();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    await _authService.ensureInitialized();
+    final userData = await _authService.getCurrentUser();
+    setState(() {
+      _currentUserId = userData['id'];
+    });
   }
 
   void _loadItem() {
@@ -392,16 +404,43 @@ class _EditItemPageState extends State<EditItemPage> {
       colors: _selectedColors,
       category: item.category, // Use the item's existing category
       inLaundry: item.inLaundry, // Preserve laundry status
+      userId: _currentUserId ?? item.userId, // Ensure user ID is preserved
     );
 
-    final index = itemsBox.values.toList().indexWhere((itemInList) => itemInList.id == item.id);
-    if (index != -1) {
-      await itemsBox.putAt(index, updatedItem);
-    }
+    try {
+      // Find the item by ID and update it
+      final index = itemsBox.values.toList().indexWhere((itemInList) => itemInList.id == item.id);
+      if (index != -1) {
+        await itemsBox.putAt(index, updatedItem);
+        print("Item updated successfully: ${updatedItem.id}");
+      } else {
+        // If item not found by index, try to find it by key
+        bool found = false;
+        for (var i = 0; i < itemsBox.length; i++) {
+          final currentItem = itemsBox.getAt(i);
+          if (currentItem is Item && currentItem.id == item.id) {
+            await itemsBox.putAt(i, updatedItem);
+            found = true;
+            print("Item updated by key: ${updatedItem.id}");
+            break;
+          }
+        }
 
-    if (mounted) {
-      // Return the updated item to the product details page
-      Navigator.pop(context, updatedItem);
+        if (!found) {
+          print("Item not found, adding as new: ${updatedItem.id}");
+          await itemsBox.add(updatedItem);
+        }
+      }
+
+      if (mounted) {
+        // Return the updated item to the product details page
+        Navigator.pop(context, updatedItem);
+      }
+    } catch (e) {
+      print("Error updating item: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error updating item: ${e.toString()}")),
+      );
     }
   }
 
@@ -607,3 +646,4 @@ Future<Directory> getImageDirectory() async {
 
   return imagesDir;
 }
+

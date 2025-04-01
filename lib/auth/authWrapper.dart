@@ -11,63 +11,45 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  final AuthService _authService = AuthService();
   bool _isLoading = true;
   bool _isLoggedIn = false;
+  late AuthService _authService;
 
   @override
   void initState() {
     super.initState();
+    _authService = AuthService();
+    _authService.addListener(_onAuthStateChanged);
     _checkAuthStatus();
   }
 
-  Future<void> _checkAuthStatus() async {
-    setState(() {
-      _isLoading = true;
-    });
+  @override
+  void dispose() {
+    _authService.removeListener(_onAuthStateChanged);
+    super.dispose();
+  }
 
-    try {
-      debugPrint('AuthWrapper: Checking auth status...');
-
-      // Ensure AuthService is initialized
-      final initSuccess = await _authService.ensureInitialized();
-
-      if (!initSuccess) {
-        debugPrint('AuthWrapper: Failed to initialize AuthService');
-        // Handle initialization failure - maybe show an error screen
-        // For now, we'll just set not logged in
-        setState(() {
-          _isLoading = false;
-          _isLoggedIn = false;
-        });
-        return;
-      }
-
-      // Check if user is logged in
-      final isLoggedIn = _authService.isLoggedIn;
-      debugPrint('AuthWrapper: Auth service initialized. User is logged in: $isLoggedIn');
-
+  void _onAuthStateChanged() {
+    if (mounted) {
       setState(() {
-        _isLoading = false;
-        _isLoggedIn = isLoggedIn;
+        _isLoggedIn = _authService.isLoggedIn;
       });
+    }
+  }
 
-      if (isLoggedIn) {
-        final userData = await _authService.getCurrentUser();
-        debugPrint('AuthWrapper: Logged in user: ${userData['name']} (${userData['email']})');
-      }
-    } catch (e) {
-      debugPrint('AuthWrapper: Error checking auth status: $e');
+  Future<void> _checkAuthStatus() async {
+    await _authService.initialize();
+
+    if (mounted) {
       setState(() {
+        _isLoggedIn = _authService.isLoggedIn;
         _isLoading = false;
-        _isLoggedIn = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Show loading indicator while initializing
     if (_isLoading) {
       return const Scaffold(
         body: Center(
@@ -76,12 +58,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    // If not logged in, show login page
+    // If not logged in, redirect to login page
     if (!_isLoggedIn) {
       return const LoginPage();
     }
 
-    // If logged in, show the home page
+    // If logged in, show the main app
     return const Homepage();
   }
 }

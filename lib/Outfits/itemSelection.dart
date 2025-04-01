@@ -5,6 +5,7 @@ import 'package:drobe/services/hiveServiceManager.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:path_provider/path_provider.dart';
+import 'package:drobe/auth/authService.dart';
 
 class ItemSelectionPage extends StatefulWidget {
   final String? slot;
@@ -33,6 +34,8 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
   bool _hasHandledInitialNavigation = false;
   bool _filterByColorPalette = true; // Default to filtering by color palette
   bool _isLoading = true;
+  String _currentUserId = '';
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
@@ -47,6 +50,19 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
 
   Future<void> _loadItemsBox() async {
     try {
+      // Get current user ID
+      final userData = await _authService.getCurrentUser();
+      _currentUserId = userData['id'] ?? '';
+
+      if (_currentUserId.isEmpty) {
+        print('Error: Unable to get current user ID');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Unable to get user information')),
+          );
+        }
+      }
+
       final hiveManager = HiveManager();
       itemsBox = await hiveManager.getBox('itemsBox');
 
@@ -216,6 +232,11 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
     if (itemsBox == null) return [];
 
     final List<Item> items = itemsBox!.values.whereType<Item>().where((item) {
+      // Filter by user ID first
+      if (_currentUserId.isNotEmpty && item.userId != _currentUserId) {
+        return false;
+      }
+
       // Check if slot is null first
       if (widget.slot == null) {
         // No slot specified, show all items
@@ -483,28 +504,11 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.palette_outlined,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'No matching items found',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    'NO MATCHING ITEMS FOUND',
+                    style: TextStyle(fontSize: 15, color: Colors.grey[600]),
                   ),
-                  if (hasPalette && _filterByColorPalette)
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _filterByColorPalette = false;
-                          });
-                        },
-                        child: const Text("Show all items"),
-                      ),
-                    ),
                 ],
               ),
             )

@@ -25,13 +25,14 @@ class ItemAdapter extends TypeAdapter<Item> {
       category: fields[5] as String,
       wearCount: fields[6] as int,
       inLaundry: fields[7] as bool,
+      userId: fields[8] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Item obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class ItemAdapter extends TypeAdapter<Item> {
       ..writeByte(6)
       ..write(obj.wearCount)
       ..writeByte(7)
-      ..write(obj.inLaundry);
+      ..write(obj.inLaundry)
+      ..writeByte(8)
+      ..write(obj.userId);
   }
 
   @override

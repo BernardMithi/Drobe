@@ -27,6 +27,9 @@ class Outfit extends HiveObject {
   @HiveField(6)
   List<String> colorPaletteStrings = [];
 
+  @HiveField(7)
+  String? userId;
+
   // Non-persisted field, computed from colorCodes
   List<Color> get colorPalette => colorCodes.map((code) => Color(code)).toList();
 
@@ -38,6 +41,7 @@ class Outfit extends HiveObject {
     required this.date,
     List<Color>? colorPalette,
     List<String>? colorPaletteStrings,
+    this.userId,
   }) :
         accessories = accessories
             .where((item) => item != null)
@@ -64,6 +68,7 @@ class Outfit extends HiveObject {
     List<String?>? accessories,
     List<Color>? colorPalette,
     List<String>? colorPaletteStrings,
+    String? userId,
   }) {
     return Outfit(
       id: id ?? this.id, // Ensure ID is preserved
@@ -73,6 +78,7 @@ class Outfit extends HiveObject {
       accessories: accessories ?? List<String?>.from(this.accessories),
       colorPalette: colorPalette ?? this.colorPalette,
       colorPaletteStrings: colorPaletteStrings ?? List<String>.from(this.colorPaletteStrings),
+      userId: userId ?? this.userId,
     );
   }
 
@@ -88,6 +94,7 @@ class Outfit extends HiveObject {
         date: map['date'] is DateTime
             ? map['date']
             : DateTime.tryParse(map['date'] as String? ?? '') ?? DateTime.now(),
+        userId: map['userId'] as String?,
       );
     } catch (e) {
       debugPrint('Error creating Outfit from map: $e');
@@ -110,6 +117,7 @@ class Outfit extends HiveObject {
       'accessories': accessories,
       'colorCodes': colorCodes,
       'date': date.toIso8601String(),
+      'userId': userId,
     };
   }
 

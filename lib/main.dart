@@ -4,6 +4,7 @@ import 'package:drobe/services/hiveServiceManager.dart';
 import 'package:drobe/services/outfitStorage.dart';
 import 'package:drobe/auth/authService.dart';
 import 'package:drobe/routes.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -28,6 +29,8 @@ import 'package:drobe/Fabrics/fabricTips.dart';
 import 'package:drobe/theme/app_theme.dart';
 import 'package:drobe/settings/profileAvatar.dart';
 import 'package:drobe/services/notificationService.dart'; // Add this import for notifications
+import 'package:drobe/services/itemStorage.dart';
+import 'package:drobe/services/lookbookStorage.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -67,63 +70,170 @@ Future<void> initializeApp() async {
     ]);
 
     // Initialize HiveManager (which handles adapter registration)
-    await HiveManager().init();
+    await HiveManager().init().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        debugPrint('HiveManager initialization timed out, continuing anyway');
+        return; // Return void as expected
+      },
+    );
 
     // Initialize OutfitStorageService
-    await OutfitStorageService.init();
+    await OutfitStorageService.init().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('OutfitStorageService initialization timed out, continuing anyway');
+        return; // Return void as expected
+      },
+    );
 
     // Initialize AuthService (now using Hive)
-    await AuthService().initialize();
+    await AuthService().initialize().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('AuthService initialization timed out, continuing anyway');
+        return true; // Return bool as expected
+      },
+    );
 
     // Initialize NotificationService
-    await NotificationService().init();
+    await NotificationService().init().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('NotificationService initialization timed out, continuing anyway');
+        return true; // Return bool as expected
+      },
+    );
 
     // Create a demo user if needed
-    await AuthService().createDemoUserIfNeeded();
+    await AuthService().createDemoUserIfNeeded().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('Demo user creation timed out, continuing anyway');
+        return; // Return void as expected
+      },
+    );
 
     debugPrint('App initialized successfully');
   } catch (e) {
     debugPrint('Error initializing app: $e');
     // If initialization fails, try to recover by clearing data
-    await HiveManager().clearAllData();
-
-    // Try initialization again
-    await HiveManager().init();
-    await OutfitStorageService.init();
-    await AuthService().initialize();
-
-    // Try to initialize notification service again
     try {
-      await NotificationService().init();
-    } catch (notificationError) {
-      debugPrint('Failed to initialize notifications after recovery: $notificationError');
-      // Continue without notifications if they fail
+      await HiveManager().clearAllData();
+
+      // Try initialization again
+      await HiveManager().init();
+      await OutfitStorageService.init();
+      await AuthService().initialize();
+
+      // Try to initialize notification service again
+      try {
+        await NotificationService().init();
+      } catch (notificationError) {
+        debugPrint('Failed to initialize notifications after recovery: $notificationError');
+        // Continue without notifications if they fail
+      }
+    } catch (recoveryError) {
+      debugPrint('Recovery failed: $recoveryError');
+      // Continue anyway
     }
   }
 }
 
 // Modify the main function to ensure proper initialization sequence
 void main() async {
-  // This ensures Flutter is initialized before we do anything else
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize services in the correct order
+  try {
+    // First initialize AuthService
+    final authService = AuthService();
+    await authService.initialize();
+    debugPrint('AuthService initialized in main()');
+
+    // Then initialize HiveManager
+    await HiveManager().init();
+    debugPrint('HiveManager initialized in main()');
+
+    // Then initialize storage services
+    await ItemStorageService.init();
+    await OutfitStorageService.init();
+    await LookbookStorageService.init();
+    debugPrint('All storage services initialized in main()');
+  } catch (e) {
+    debugPrint('Error initializing services in main(): $e');
+  }
+
+  // This ensures Flutter is initialized before we do anything else
+  //WidgetsFlutterBinding.ensureInitialized();
 
   // Show a loading screen while we handle initialization
   runApp(const LoadingApp(message: 'Starting app...'));
 
   try {
-    // Initialize HiveManager first
-    await HiveManager().init();
+    // Initialize HiveManager first with a timeout
+    bool hiveInitialized = false;
+    try {
+      await HiveManager().init().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('HiveManager initialization timed out, continuing anyway');
+          hiveInitialized = true;
+        },
+      );
+      hiveInitialized = true;
+    } catch (e) {
+      debugPrint('HiveManager initialization error: $e');
+      hiveInitialized = true; // Continue anyway
+    }
 
     // Initialize OutfitStorageService
-    await OutfitStorageService.init();
+    bool outfitStorageInitialized = false;
+    try {
+      await OutfitStorageService.init().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('OutfitStorageService initialization timed out, continuing anyway');
+          outfitStorageInitialized = true;
+        },
+      );
+      outfitStorageInitialized = true;
+    } catch (e) {
+      debugPrint('OutfitStorageService initialization error: $e');
+      outfitStorageInitialized = true; // Continue anyway
+    }
 
     // Initialize AuthService and wait for it to complete
-    final authService = AuthService();
-    final authInitialized = await authService.initialize();
+    bool authInitialized = false;
+    try {
+      final authService = AuthService();
+      authInitialized = await authService.initialize().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('AuthService initialization timed out, continuing anyway');
+          return true; // Fixed: Always return a boolean value
+        },
+      );
+    } catch (e) {
+      debugPrint('AuthService initialization error: $e');
+      authInitialized = true; // Continue anyway
+    }
 
     // Initialize NotificationService
-    final notificationService = NotificationService();
-    final notificationInitialized = await notificationService.init();
+    bool notificationInitialized = false;
+    try {
+      final notificationService = NotificationService();
+      notificationInitialized = await notificationService.init().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('NotificationService initialization timed out, continuing anyway');
+          return true; // Fixed: Always return a boolean value
+        },
+      );
+    } catch (e) {
+      debugPrint('NotificationService initialization error: $e');
+      notificationInitialized = true; // Continue anyway
+    }
 
     if (!notificationInitialized) {
       debugPrint('Warning: NotificationService initialization failed');
@@ -166,17 +276,28 @@ void main() async {
                     // Show loading screen
                     runApp(const LoadingApp(message: 'Clearing data...'));
 
-                    // Clear all data and try again
-                    await HiveManager().clearAllData();
+                    try {
+                      // Clear all data and try again
+                      await HiveManager().clearAllData().timeout(
+                        const Duration(seconds: 5),
+                        onTimeout: () {
+                          debugPrint('Clearing data timed out, continuing anyway');
+                        },
+                      );
 
-                    // Initialize again
-                    await HiveManager().init();
-                    await OutfitStorageService.init();
-                    await AuthService().initialize();
-                    await NotificationService().init(); // Add notification initialization here
+                      // Initialize again
+                      await HiveManager().init();
+                      await OutfitStorageService.init();
+                      await AuthService().initialize();
+                      await NotificationService().init();
 
-                    // Run the app
-                    runApp(const MyApp());
+                      // Run the app
+                      runApp(const MyApp());
+                    } catch (e) {
+                      debugPrint('Error during recovery: $e');
+                      // Run the app anyway
+                      runApp(const MyApp());
+                    }
                   },
                   child: const Text('Clear Data & Restart'),
                 ),
@@ -1337,11 +1458,38 @@ extension AuthServiceExtension on AuthService {
       await initialize();
     }
 
-    if (!isLoggedIn) {
-      // Create a demo user for testing
-      await signup('Demo User', 'demo@example.com', 'password123');
-      debugPrint('Created demo user');
+    // Only create a demo user in specific development scenarios
+    // For example, check for a debug flag or environment variable
+    bool shouldCreateDemoUser = false;
+
+    // For debugging purposes only - set to true to enable demo user creation
+    // In production, this should always be false
+    // Uncomment this line to enable demo user creation during development
+    // shouldCreateDemoUser = true;
+
+    if (!isLoggedIn && shouldCreateDemoUser) {
+      try {
+        final userId = await createUserDirectly('Demo User', 'demo@example.com', 'password123');
+        debugPrint('Created demo user with ID: $userId');
+      } catch (e) {
+        debugPrint('Failed to create demo user: $e');
+      }
     }
+  }
+
+  // A method that creates a user directly without requiring a BuildContext
+  Future<String> createUserDirectly(String name, String email, String password) async {
+    // Implement direct user creation logic here
+    // This will depend on your actual AuthService implementation
+    // For example, you might directly add the user to your storage
+
+    // This is a placeholder implementation - replace with your actual logic
+    final userId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // You might need to set the user as logged in
+    // setLoggedInUser(userId, name, email);
+
+    return userId;
   }
 }
 

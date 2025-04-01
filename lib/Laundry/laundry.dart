@@ -21,11 +21,39 @@ class _LaundryPageState extends State<LaundryPage> {
   List<Item> _laundryItems = [];
   Set<String> _selectedItems = {};
   late Box itemsBox;
+  String _currentUserId = '';
 
   @override
   void initState() {
     super.initState();
-    _loadLaundryItems();
+    _getCurrentUserAndLoadItems();
+  }
+
+  Future<void> _getCurrentUserAndLoadItems() async {
+    try {
+      // Get current user ID
+      final userData = await AuthService().getCurrentUser();
+      _currentUserId = userData['id'] ?? '';
+
+      if (_currentUserId.isEmpty) {
+        print('Error: Unable to get current user ID');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Unable to get user information')),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Load laundry items for the current user
+      await _loadLaundryItems();
+    } catch (e) {
+      print('Error getting current user: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadLaundryItems() async {
@@ -38,10 +66,12 @@ class _LaundryPageState extends State<LaundryPage> {
       final HiveManager hiveManager = HiveManager();
       final box = await hiveManager.getBox('itemsBox');
 
-      // Filter for items in laundry
+      // Filter for items in laundry that belong to the current user
       final List<Item> laundryItems = [];
       for (var item in box.values) {
-        if (item is Item && item.inLaundry) {
+        if (item is Item &&
+            item.inLaundry &&
+            item.userId == _currentUserId) {
           laundryItems.add(item);
         }
       }
@@ -53,7 +83,7 @@ class _LaundryPageState extends State<LaundryPage> {
         _selectedItems.clear();
       });
 
-      debugPrint('Loaded ${_laundryItems.length} laundry items');
+      debugPrint('Loaded ${_laundryItems.length} laundry items for user $_currentUserId');
     } catch (e) {
       print('Error loading laundry items: $e');
       setState(() {
@@ -137,7 +167,9 @@ class _LaundryPageState extends State<LaundryPage> {
         // Find the item in the box
         for (final key in itemsBox.keys) {
           final item = itemsBox.get(key);
-          if (item is Item && item.id == itemId) {
+          if (item is Item &&
+              item.id == itemId &&
+              item.userId == _currentUserId) {
             // Mark as clean (removes from laundry)
             item.inLaundry = false;
 
@@ -183,12 +215,14 @@ class _LaundryPageState extends State<LaundryPage> {
 
       // Mark all items as clean
       for (final item in _laundryItems) {
-        // Mark as clean (removes from laundry)
-        item.inLaundry = false;
+        if (item.userId == _currentUserId) {
+          // Mark as clean (removes from laundry)
+          item.inLaundry = false;
 
-        // Save the item back to the box
-        await item.save();
-        updatedCount++;
+          // Save the item back to the box
+          await item.save();
+          updatedCount++;
+        }
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -232,7 +266,7 @@ class _LaundryPageState extends State<LaundryPage> {
                 builder: (context, snapshot) {
                   final userData = snapshot.data ?? {'id': '', 'name': '', 'email': ''};
                   return ProfileAvatar(
-                    key: ValueKey('outfits_avatar_${DateTime.now().millisecondsSinceEpoch}'),
+                    key: ValueKey('laundry_avatar_${DateTime.now().millisecondsSinceEpoch}'),
                     size: 42,
                     userId: userData['id'] ?? '',
                     name: userData['name'] ?? '',
@@ -242,7 +276,8 @@ class _LaundryPageState extends State<LaundryPage> {
               ),
             ),
           ),
-        ],     ),
+        ],
+      ),
       body: Column(
         children: [
           // Header with item count

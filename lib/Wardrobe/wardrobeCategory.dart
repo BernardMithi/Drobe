@@ -7,6 +7,7 @@ import 'addItem.dart';
 import 'editItem.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:drobe/auth/authService.dart';
 
 class WardrobeCategoryPage extends StatefulWidget {
   final String category;
@@ -18,16 +19,17 @@ class WardrobeCategoryPage extends StatefulWidget {
 }
 
 class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
-  Box? itemsBox; // Start with null
   final HiveManager _hiveManager = HiveManager(); // Use the centralized service
   final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
   bool _isLoading = true;
+  List<Item> _items = [];
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _loadBox();
+    _loadUserItems();
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text;
@@ -35,20 +37,77 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
     });
   }
 
-  Future<void> _loadBox() async {
+  Future<void> _loadUserItems() async {
+    if (!mounted) return;
+
     try {
-      itemsBox = await _hiveManager.getBox('itemsBox');
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Get the current user ID
+      final authService = AuthService();
+      await authService.ensureInitialized();
+      final userData = await authService.getCurrentUser();
+      _currentUserId = userData['id'];
+
+      if (_currentUserId == null || _currentUserId!.isEmpty) {
+        debugPrint('Warning: No current user ID available in wardrobeCategory');
+        if (mounted) {
+          setState(() {
+            _items = [];
+            _isLoading = false;
+          });
+
+          // Show a message to the user
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please log in to view your items'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get items for the current user and category
+      final box = await _hiveManager.getBox('itemsBox');
+      final List<Item> allItems = [];
+
+      // Iterate through all items and filter by user ID and category
+      for (var item in box.values) {
+        if (item is Item) {
+          // ONLY include items that explicitly match the current user ID
+          if (item.userId == _currentUserId && item.category == widget.category) {
+            allItems.add(item);
+          }
+        }
+      }
+
+      // Debug logging
+      debugPrint('Loaded ${allItems.length} items for user $_currentUserId in category ${widget.category}');
+
       if (mounted) {
         setState(() {
+          _items = allItems;
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('Error loading box: $e');
+      debugPrint('Error loading user items: $e');
       if (mounted) {
         setState(() {
+          _items = [];
           _isLoading = false;
         });
+
+        // Show an error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading items: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
   }
@@ -60,28 +119,21 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
   }
 
   List<Item> get filteredItems {
-    if (_isLoading || itemsBox == null) {
+    if (_isLoading || _items.isEmpty) {
       return [];
     }
 
     try {
-      final List<Item> items = [];
-
-      for (var value in itemsBox!.values) {
-        if (value is Item) {
-          final item = value;
-          if (item.category == widget.category &&
-              (_searchText.isEmpty ||
-                  item.name.toLowerCase().contains(_searchText.toLowerCase()) ||
-                  item.description.toLowerCase().contains(_searchText.toLowerCase()))) {
-            items.add(item);
-          }
-        }
+      if (_searchText.isEmpty) {
+        return _items;
       }
 
-      return items;
+      return _items.where((item) =>
+      item.name.toLowerCase().contains(_searchText.toLowerCase()) ||
+          item.description.toLowerCase().contains(_searchText.toLowerCase())
+      ).toList();
     } catch (e) {
-      print('Error filtering items: $e');
+      debugPrint('Error filtering items: $e');
       return [];
     }
   }
@@ -96,22 +148,15 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
 
     if (result == null) { // Item was deleted
       setState(() {}); // Refresh UI immediately after deletion
+      _loadUserItems(); // Reload items from storage
       return;
     }
 
+    // Item was updated
     setState(() {
-      try {
-        // Find the key for this item
-        final key = itemsBox?.keys.firstWhere(
-              (k) => itemsBox?.get(k) is Item && (itemsBox?.get(k) as Item).id == selectedItem.id,
-          orElse: () => null,
-        );
-
-        if (key != null) {
-          itemsBox?.put(key, result);
-        }
-      } catch (e) {
-        print('Error updating item: $e');
+      final index = _items.indexWhere((item) => item.id == result.id);
+      if (index >= 0) {
+        _items[index] = result;
       }
     });
   }
@@ -162,7 +207,7 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
     );
 
     if (result != null) {
-      setState(() {}); // Refresh the list
+      _loadUserItems(); // Reload items to include the new one
     }
   }
 
@@ -226,7 +271,7 @@ class _WardrobeCategoryPageState extends State<WardrobeCategoryPage> {
                 mainAxisSpacing: 10,
               ),
               itemCount: filteredItems.length,
-              itemBuilder: (context, index) {
+              itemBuilder: (BuildContext context, int index) {
                 final item = filteredItems[index];
                 return GestureDetector(
                   onTap: () => _selectItem(item),

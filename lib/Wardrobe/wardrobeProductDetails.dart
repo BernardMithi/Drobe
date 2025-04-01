@@ -52,13 +52,32 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   void _moveToLaundry() {
     setState(() {
       item.moveToLaundry();
+
+      // Save the updated item to Hive
+      _saveItemChanges();
     });
   }
 
   void _markAsClean() {
     setState(() {
       item.markAsClean();
+
+      // Save the updated item to Hive
+      _saveItemChanges();
     });
+  }
+
+  // Add this method to save item changes to Hive
+  void _saveItemChanges() {
+    try {
+      int itemIndex = itemsBox.values.toList().indexWhere((i) => i.id == item.id);
+      if (itemIndex != -1) {
+        itemsBox.putAt(itemIndex, item);
+        print("Item updated in Hive: ${item.id}");
+      }
+    } catch (e) {
+      print("Error saving item changes: $e");
+    }
   }
 
   @override
@@ -87,6 +106,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     Navigator.pop(context);
                   }
                 } else if (result is Item) {
+                  // Update the local item with the edited one
                   setState(() {
                     item = result;
                     _selectedColors = List<int>.from(item.colors ?? []);
@@ -95,6 +115,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     _fullImagePath = null;
                     _getFullImagePath();
                   });
+
+                  // Return the updated item to the previous screen
+                  Navigator.pop(context, item);
                 }
               }
             },
@@ -265,3 +288,4 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 }
+

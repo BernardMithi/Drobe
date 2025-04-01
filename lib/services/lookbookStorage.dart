@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/lookbookItem.dart';
 import 'package:uuid/uuid.dart';
 import 'hiveServiceManager.dart';
+import 'package:drobe/auth/authService.dart';
 
 class LookbookStorageService {
   static const String lookbookBoxName = 'lookbookItems';
@@ -35,7 +36,10 @@ class LookbookStorageService {
       }
 
       // Open the lookbook box
-      await HiveManager().getBox(lookbookBoxName);
+      final box = await HiveManager().getBox(lookbookBoxName);
+
+      // Migrate existing lookbook items to include userId
+      await _migrateLookbookItemsToIncludeUserId(box);
 
       _initialized = true;
       debugPrint('LookbookStorageService initialized successfully');
@@ -48,7 +52,49 @@ class LookbookStorageService {
     }
   }
 
-  /// Save a lookbook item to storage
+  /// Migrate existing lookbook items to include userId
+  static Future<void> _migrateLookbookItemsToIncludeUserId(Box box) async {
+    try {
+      // Get the current user ID
+      final authService = AuthService();
+      await authService.ensureInitialized();
+      final userData = await authService.getCurrentUser();
+      final currentUserId = userData['id'];
+
+      if (currentUserId == null || currentUserId.isEmpty) {
+        debugPrint('Cannot migrate lookbook items: No current user ID available');
+        return;
+      }
+
+      // Get all lookbook items that don't have a userId
+      final itemsToMigrate = <String, LookbookItem>{};
+
+      for (final key in box.keys) {
+        final item = box.get(key);
+        if (item is LookbookItem && (item.userId == null || item.userId!.isEmpty)) {
+          itemsToMigrate[key.toString()] = item;
+        }
+      }
+
+      debugPrint('Found ${itemsToMigrate.length} lookbook items to migrate');
+
+      // Update each lookbook item with the current user's ID
+      for (final entry in itemsToMigrate.entries) {
+        final key = entry.key;
+        final item = entry.value;
+
+        final updatedItem = item.copyWith(userId: currentUserId);
+        await box.put(key, updatedItem);
+        debugPrint('Migrated lookbook item ${item.id} to user $currentUserId');
+      }
+
+      debugPrint('Lookbook item migration completed');
+    } catch (e) {
+      debugPrint('Error migrating lookbook items: $e');
+    }
+  }
+
+// Modify the saveItem method to set the userId
   static Future<LookbookItem> saveItem(LookbookItem item) async {
     try {
       final box = await HiveManager().getBox(lookbookBoxName);
@@ -63,6 +109,20 @@ class LookbookStorageService {
         if (box.containsKey(item.id)) {
           debugPrint('Overwriting existing lookbook item with ID: ${item.id}');
         }
+      }
+
+      // Get the current user ID and set it on the item
+      final authService = AuthService();
+      await authService.ensureInitialized();
+      final userData = await authService.getCurrentUser();
+      final currentUserId = userData['id'];
+
+      if (currentUserId == null || currentUserId.isEmpty) {
+        debugPrint('Warning: No current user ID available when saving lookbook item');
+      } else {
+        // Always set the userId to the current user
+        item = item.copyWith(userId: currentUserId);
+        debugPrint('Set userId $currentUserId for lookbook item ${item.id}');
       }
 
       // Verify the ID is set before saving
@@ -82,7 +142,7 @@ class LookbookStorageService {
         throw Exception('Failed to save lookbook item: ${item.name}');
       }
 
-      debugPrint('Successfully saved lookbook item with ID: ${item.id}, Name: ${item.name}');
+      debugPrint('Successfully saved lookbook item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
 
       // Return the saved lookbook item with its ID
       return savedItem;
@@ -92,31 +152,47 @@ class LookbookStorageService {
     }
   }
 
-  /// Get all saved lookbook items
+// Modify the getAllItems method to filter by userId
   static Future<List<LookbookItem>> getAllItems() async {
     try {
       final box = await HiveManager().getBox(lookbookBoxName);
       final items = <LookbookItem>[];
 
-      debugPrint('Loading all lookbook items. Total in box: ${box.length}');
+      // Get the current user ID
+      final authService = AuthService();
+      await authService.ensureInitialized();
+      final userData = await authService.getCurrentUser();
+      final currentUserId = userData['id'];
+
+      if (currentUserId == null || currentUserId.isEmpty) {
+        debugPrint('Warning: No current user ID available, returning empty lookbook item list');
+        return [];
+      }
+
+      debugPrint('Loading lookbook items for user: $currentUserId. Total in box: ${box.length}');
 
       for (final key in box.keys) {
         try {
           final item = box.get(key);
           if (item != null && item is LookbookItem) {
-            // Ensure the item has an ID
-            if (item.id == null || item.id!.isEmpty) {
-              item.id = key.toString();
-              await box.put(key, item);
-              debugPrint('Fixed missing ID for lookbook item: ${item.name}');
+            // Only include items that belong to the current user
+            if (item.userId == currentUserId) {
+              // Ensure the item has an ID
+              if (item.id == null || item.id!.isEmpty) {
+                item.id = key.toString();
+                await box.put(key, item);
+                debugPrint('Fixed missing ID for lookbook item: ${item.name}');
+              }
+
+              items.add(item);
             }
-            items.add(item);
           }
         } catch (e) {
           debugPrint('Error loading lookbook item with key $key: $e');
         }
       }
 
+      debugPrint('Loaded ${items.length} lookbook items for user $currentUserId');
       return items;
     } catch (e) {
       debugPrint('Error getting all lookbook items: $e');
@@ -128,7 +204,37 @@ class LookbookStorageService {
   static Future<LookbookItem?> getItem(String id) async {
     try {
       final box = await HiveManager().getBox(lookbookBoxName);
-      return box.get(id) as LookbookItem?;
+      final item = box.get(id) as LookbookItem?;
+
+      if (item == null) {
+        return null;
+      }
+
+      // Get the current user ID
+      final authService = AuthService();
+      await authService.ensureInitialized();
+      final userData = await authService.getCurrentUser();
+      final currentUserId = userData['id'];
+
+      if (currentUserId == null || currentUserId.isEmpty) {
+        debugPrint('Warning: No current user ID available when getting lookbook item');
+        return null;
+      }
+
+      // Only return the item if it belongs to the current user or has no userId (legacy item)
+      if (item.userId == null || item.userId!.isEmpty || item.userId == currentUserId) {
+        // If the item has no userId, assign the current user's ID
+        if (item.userId == null || item.userId!.isEmpty) {
+          item.userId = currentUserId;
+          await box.put(id, item);
+          debugPrint('Assigned userId $currentUserId to lookbook item: ${item.name}');
+        }
+
+        return item;
+      }
+
+      debugPrint('Cannot access lookbook item: It belongs to another user');
+      return null;
     } catch (e) {
       debugPrint('Error getting lookbook item with ID $id: $e');
       return null;
@@ -139,8 +245,31 @@ class LookbookStorageService {
   static Future<void> deleteItem(String id) async {
     try {
       final box = await HiveManager().getBox(lookbookBoxName);
-      await box.delete(id);
-      debugPrint('Deleted lookbook item with ID: $id');
+      final item = box.get(id) as LookbookItem?;
+
+      if (item == null) {
+        debugPrint('Lookbook item with ID $id not found');
+        return;
+      }
+
+      // Get the current user ID
+      final authService = AuthService();
+      await authService.ensureInitialized();
+      final userData = await authService.getCurrentUser();
+      final currentUserId = userData['id'];
+
+      if (currentUserId == null || currentUserId.isEmpty) {
+        debugPrint('Cannot delete lookbook item: No current user ID available');
+        return;
+      }
+
+      // Only delete the item if it belongs to the current user or has no userId (legacy item)
+      if (item.userId == null || item.userId!.isEmpty || item.userId == currentUserId) {
+        await box.delete(id);
+        debugPrint('Deleted lookbook item with ID: $id');
+      } else {
+        debugPrint('Cannot delete lookbook item: It belongs to another user');
+      }
     } catch (e) {
       debugPrint('Error deleting lookbook item with ID $id: $e');
     }
@@ -157,9 +286,35 @@ class LookbookStorageService {
 
       final box = await HiveManager().getBox(lookbookBoxName);
 
+      // Get the current user ID
+      final authService = AuthService();
+      await authService.ensureInitialized();
+      final userData = await authService.getCurrentUser();
+      final currentUserId = userData['id'];
+
+      if (currentUserId == null || currentUserId.isEmpty) {
+        debugPrint('Cannot update lookbook item: No current user ID available');
+        throw Exception('Cannot update lookbook item: No current user ID available');
+      }
+
       // Check if the item exists before updating
-      if (!box.containsKey(item.id)) {
+      final existingItem = box.get(item.id) as LookbookItem?;
+
+      if (existingItem == null) {
         debugPrint('WARNING: Lookbook item with ID ${item.id} not found in box. Creating new entry.');
+        // This is a new item, so set the userId
+        item = item.copyWith(userId: currentUserId);
+      } else {
+        // Verify the item belongs to the current user
+        if (existingItem.userId != null && existingItem.userId!.isNotEmpty && existingItem.userId != currentUserId) {
+          debugPrint('Cannot update lookbook item: It belongs to another user');
+          throw Exception('Cannot update lookbook item: It belongs to another user');
+        }
+
+        // Preserve the userId if it exists, otherwise set it
+        if (item.userId == null || item.userId!.isEmpty) {
+          item = item.copyWith(userId: currentUserId);
+        }
       }
 
       // Put the updated item with the same ID
@@ -173,7 +328,7 @@ class LookbookStorageService {
         throw Exception('Failed to update lookbook item: ${item.name}');
       }
 
-      debugPrint('Successfully updated lookbook item with ID: ${item.id}, Name: ${item.name}');
+      debugPrint('Successfully updated lookbook item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
 
       // Return the updated lookbook item
       return updatedItem;
