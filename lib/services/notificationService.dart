@@ -40,15 +40,12 @@ class NotificationService {
       const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/launcher_icon');
 
+      // Updated iOS initialization settings - removed onDidReceiveLocalNotification
       final DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
-        onDidReceiveLocalNotification: (int id, String? title, String? body, String? payload) async {
-          // Handle iOS foreground notification
-          debugPrint('Received iOS notification: $title');
-        },
       );
 
       final InitializationSettings initializationSettings = InitializationSettings(
@@ -209,7 +206,7 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      // Schedule the notification to repeat daily
+      // Schedule the notification to repeat daily - updated to remove UILocalNotificationDateInterpretation
       await flutterLocalNotificationsPlugin.zonedSchedule(
         outfitReminderId,
         'Plan Your Outfit',
@@ -217,7 +214,6 @@ class NotificationService {
         scheduledDate,
         platformDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time, // Repeat daily at the same time
         payload: 'outfit_reminder',
       );
@@ -314,7 +310,7 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      // Schedule the notification to repeat weekly
+      // Schedule the notification to repeat weekly - updated to remove UILocalNotificationDateInterpretation
       await flutterLocalNotificationsPlugin.zonedSchedule(
         laundryReminderId,
         'Laundry Day',
@@ -322,7 +318,6 @@ class NotificationService {
         scheduledDate,
         platformDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime, // Repeat weekly on the same day and time
         payload: 'laundry_reminder',
       );
@@ -376,7 +371,5 @@ class NotificationService {
       debugPrint('Error cancelling all reminders: $e');
     }
   }
-
-  // For testing purposes - shows an immediate notification
 }
 
