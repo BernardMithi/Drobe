@@ -1,17 +1,45 @@
+import 'package:flutter/foundation.dart';
+
+/// Represents a fabric care tip or article with detailed information.
+///
+/// This model contains all the information needed to display a fabric tip,
+/// including content, metadata, and related information.
 class FabricTip {
+  /// Unique identifier for the tip
   final String id;
+
+  /// Main title of the tip
   final String title;
+
+  /// Short description or summary of the tip
   final String description;
+
+  /// Full content/body of the tip
   final String content;
+
+  /// URL to the main image for the tip
   final String imageUrl;
+
+  /// List of categories this tip belongs to (e.g., 'cotton', 'care', 'washing')
   final List<String> categories;
+
+  /// Author of the tip
   final String author;
+
+  /// Publication date of the tip
   final String date;
+
+  /// List of specific care instructions for the fabric
   final List<String> careInstructions;
+
+  /// Additional helpful tips related to the fabric
   final List<String> tips;
+
+  /// Other fabrics that are related or similar
   final List<String> relatedFabrics;
 
-  FabricTip({
+  /// Creates a new [FabricTip] instance.
+  const FabricTip({
     required this.id,
     required this.title,
     required this.description,
@@ -24,9 +52,155 @@ class FabricTip {
     this.tips = const [],
     this.relatedFabrics = const [],
   });
+
+  /// Creates a copy of this [FabricTip] with the given fields replaced with new values.
+  FabricTip copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? content,
+    String? imageUrl,
+    List<String>? categories,
+    String? author,
+    String? date,
+    List<String>? careInstructions,
+    List<String>? tips,
+    List<String>? relatedFabrics,
+  }) {
+    return FabricTip(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      content: content ?? this.content,
+      imageUrl: imageUrl ?? this.imageUrl,
+      categories: categories ?? this.categories,
+      author: author ?? this.author,
+      date: date ?? this.date,
+      careInstructions: careInstructions ?? this.careInstructions,
+      tips: tips ?? this.tips,
+      relatedFabrics: relatedFabrics ?? this.relatedFabrics,
+    );
+  }
+
+  /// Converts this [FabricTip] to a Map.
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'content': content,
+      'imageUrl': imageUrl,
+      'categories': categories,
+      'author': author,
+      'date': date,
+      'careInstructions': careInstructions,
+      'tips': tips,
+      'relatedFabrics': relatedFabrics,
+    };
+  }
+
+  /// Creates a [FabricTip] from a Map.
+  factory FabricTip.fromMap(Map<String, dynamic> map) {
+    return FabricTip(
+      id: map['id'] ?? '',
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      content: map['content'] ?? '',
+      imageUrl: map['imageUrl'] ?? '',
+      categories: List<String>.from(map['categories'] ?? []),
+      author: map['author'] ?? '',
+      date: map['date'] ?? '',
+      careInstructions: List<String>.from(map['careInstructions'] ?? []),
+      tips: List<String>.from(map['tips'] ?? []),
+      relatedFabrics: List<String>.from(map['relatedFabrics'] ?? []),
+    );
+  }
+
+  @override
+  String toString() {
+    return 'FabricTip(id: $id, title: $title, author: $author)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is FabricTip &&
+        other.id == id &&
+        other.title == title &&
+        other.description == description &&
+        other.content == content &&
+        other.imageUrl == imageUrl &&
+        listEquals(other.categories, categories) &&
+        other.author == author &&
+        other.date == date &&
+        listEquals(other.careInstructions, careInstructions) &&
+        listEquals(other.tips, tips) &&
+        listEquals(other.relatedFabrics, relatedFabrics);
+  }
+
+  @override
+  int get hashCode {
+    return id.hashCode ^
+    title.hashCode ^
+    description.hashCode ^
+    content.hashCode ^
+    imageUrl.hashCode ^
+    categories.hashCode ^
+    author.hashCode ^
+    date.hashCode ^
+    careInstructions.hashCode ^
+    tips.hashCode ^
+    relatedFabrics.hashCode;
+  }
 }
 
-// Sample data for fabric tips
+/// Helper class to manage fabric tips data and operations.
+class FabricTipRepository {
+  /// Returns all available fabric tips.
+  static List<FabricTip> getAllTips() => fabricTips;
+
+  /// Finds a fabric tip by its ID.
+  static FabricTip? findById(String id) {
+    try {
+      return fabricTips.firstWhere((tip) => tip.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Returns tips filtered by category.
+  static List<FabricTip> getByCategory(String category) {
+    return fabricTips.where((tip) =>
+        tip.categories.contains(category.toLowerCase())).toList();
+  }
+
+  /// Returns tips by a specific author.
+  static List<FabricTip> getByAuthor(String author) {
+    return fabricTips.where((tip) =>
+    tip.author.toLowerCase() == author.toLowerCase()).toList();
+  }
+
+  /// Searches tips by query string in title, description, or content.
+  static List<FabricTip> search(String query) {
+    final lowercaseQuery = query.toLowerCase();
+    return fabricTips.where((tip) =>
+    tip.title.toLowerCase().contains(lowercaseQuery) ||
+        tip.description.toLowerCase().contains(lowercaseQuery) ||
+        tip.content.toLowerCase().contains(lowercaseQuery)).toList();
+  }
+
+  /// Returns all unique categories across all tips.
+  static List<String> getAllCategories() {
+    final Set<String> categories = {};
+    for (final tip in fabricTips) {
+      categories.addAll(tip.categories);
+    }
+    return categories.toList()..sort();
+  }
+}
+
+/// Sample data for fabric tips.
 final List<FabricTip> fabricTips = [
   FabricTip(
     id: '1',
@@ -257,13 +431,13 @@ Linen is exceptionally durable and becomes softer and more luminous with each wa
       'Store linen items in a cool, dry place with good air circulation.',
     ],
     tips: [
-  "Embrace linen's natural tendency to wrinkle as part of its character and charm.",
-  'For stubborn wrinkles, use steam rather than high heat ironing.',
-    'Avoid folding linen in the same place repeatedly to prevent permanent creases.',
-    'Pre-wash new linen items before first wear to remove sizing and begin the softening process.',
-    'Consider washing dark linen separately for the first few washes to prevent color transfer.',
+      "Embrace linen's natural tendency to wrinkle as part of its character and charm.",
+      'For stubborn wrinkles, use steam rather than high heat ironing.',
+      'Avoid folding linen in the same place repeatedly to prevent permanent creases.',
+      'Pre-wash new linen items before first wear to remove sizing and begin the softening process.',
+      'Consider washing dark linen separately for the first few washes to prevent color transfer.',
     ],
-  relatedFabrics: ['Cotton', 'Hemp', 'Ramie', 'Flax'],
+    relatedFabrics: ['Cotton', 'Hemp', 'Ramie', 'Flax'],
   ),
 
   FabricTip(
@@ -299,5 +473,75 @@ Despite its delicate feel, cashmere is relatively durable when properly cared fo
     ],
     relatedFabrics: ['Merino Wool', 'Alpaca', 'Mohair', 'Pashmina'],
   ),
-];
 
+  FabricTip(
+    id: '9',
+    title: 'Building a Capsule Wardrobe: Quality Over Quantity',
+    description: 'How to create a versatile, sustainable wardrobe with fewer, better pieces that work together seamlessly.',
+    imageUrl: 'https://images.unsplash.com/photo-1560243563-062bfc001d68?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+    categories: ['capsule wardrobe', 'minimalism', 'sustainability', 'fashion'],
+    author: 'Harper Lee',
+    date: 'January 15, 2024',
+    content: '''
+A capsule wardrobe is a curated collection of versatile, timeless pieces that work well together and can be mixed and matched to create numerous outfits. This concept offers a refreshing alternative to fast fashion, emphasizing quality over quantity and mindful consumption.
+
+The term "capsule wardrobe" was coined in the 1970s by London boutique owner Susie Faux and later popularized by designer Donna Karan with her "Seven Easy Pieces" collection in 1985. The idea has experienced a resurgence in recent years as more people seek sustainable alternatives to fast fashion and ways to simplify their lives.
+
+At its core, a capsule wardrobe consists of a limited number of essential items that don't go out of fashion, supplemented with seasonal pieces. The typical capsule wardrobe contains between 25-50 items, including clothing, shoes, and accessories, though the exact number varies based on individual needs and lifestyles.
+
+The benefits of adopting a capsule wardrobe approach are numerous. It saves time by eliminating the "what to wear" dilemma, saves money by reducing impulse purchases, reduces environmental impact through mindful consumption, and often results in a more cohesive personal style.
+
+### How to Build Your Capsule Wardrobe
+
+**Step 1: Assess Your Lifestyle**
+Begin by analyzing how you spend your time. Do you work in a formal office environment, or is your workplace casual? Do you attend many social events? Do you exercise regularly? Understanding your lifestyle helps determine what types of clothing you actually need.
+
+**Step 2: Define Your Personal Style**
+Identify colors, silhouettes, and styles that you love and feel confident wearing. Create a mood board or Pinterest collection of outfits that resonate with you, and look for common elements. Your capsule should reflect your authentic style, not passing trends.
+
+**Step 3: Choose a Color Palette**
+Select a cohesive color scheme with:
+- 1-2 base neutrals (black, navy, gray, brown)
+- 1-2 accent neutrals (white, cream, tan)
+- 1-3 accent colors that complement each other and your complexion
+
+A harmonious color palette ensures that most items in your wardrobe can be worn together.
+
+**Step 4: Select Your Essential Pieces**
+Focus on high-quality basics that form the foundation of your wardrobe:
+- 2-3 pairs of well-fitting jeans or pants
+- 1-2 skirts or dresses (if applicable)
+- 3-5 tops for each season (t-shirts, blouses, button-downs)
+- 2-3 layering pieces (cardigans, blazers, jackets)
+- 1-2 pairs of shoes for each season
+- A few versatile accessories
+
+**Step 5: Focus on Quality Fabrics**
+Invest in natural, durable fabrics that will last longer and age beautifully:
+- Cotton: Breathable and versatile for everyday wear
+- Wool: Warm, naturally wrinkle-resistant, and long-lasting
+- Linen: Cooling and gets better with age
+- Silk: Luxurious, temperature-regulating, and timeless
+- Cashmere: Incredibly soft and warm for winter pieces
+- Leather: Durable and develops character over time
+
+Quality fabrics not only last longer but also tend to look better, feel more comfortable, and drape more flatteringly on the body.
+''',
+    careInstructions: [
+      "Invest in proper hangers that won't stretch or damage your clothing.",
+      'Learn basic mending skills to extend the life of your garments.',
+      'Follow fabric-specific care instructions for each piece in your capsule.',
+      'Store seasonal items properly when not in use to prevent damage.',
+      'Regularly assess your capsule and remove items that no longer serve you.',
+    ],
+    tips: [
+      'Start by decluttering your existing wardrobe before building your capsule.',
+      'Implement a "one in, one out" rule to maintain your capsule size.',
+      'Choose versatile pieces that can be dressed up or down for different occasions.',
+      'Consider your body shape and personal coloring when selecting pieces.',
+      'Track your outfits for a month to identify gaps or redundancies in your capsule.',
+      "Don't rush the process—build your capsule gradually by replacing worn items with quality pieces.",
+    ],
+    relatedFabrics: ['Cotton', 'Wool', 'Linen', 'Silk', 'Cashmere', 'Denim'],
+  ),
+];

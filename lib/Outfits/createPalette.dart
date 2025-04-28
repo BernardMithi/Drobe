@@ -12,6 +12,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:drobe/services/hiveServiceManager.dart';
 import 'package:drobe/settings/profile.dart';
 import 'package:drobe/auth/authService.dart';
+import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
 class CreatePalettePage extends StatefulWidget {
   final DateTime selectedDate;
@@ -30,6 +32,10 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   bool _useGreyPalette = false; // Only use grey when needed
   String? _currentUserId;
   final AuthService _authService = AuthService();
+  String _selectedColorScheme = 'custom'; // Default to custom
+  final List<String> _colorSchemes = ['custom', 'monochromatic', 'complementary', 'analogous'];
+  String? _colorTheoryTip;
+  Color? _baseTheoryColor;
 
   @override
   void initState() {
@@ -212,7 +218,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
             if (!colorMap.containsKey(colorWithAlpha)) {
               try {
                 colorMap[colorWithAlpha] = ColorTile(
-                    color: Color(colorWithAlpha),
+                  color: Color(colorWithAlpha),
 
                 );
                 print('Added color: 0x${colorWithAlpha.toRadixString(16)} from ${item.name}');
@@ -323,6 +329,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         );
       }
     }
+    _colorTheoryTip = _analyzePalette();
   }
 
   @override
@@ -336,7 +343,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon:  Icon(
+            icon: Icon(
               Icons.account_circle,
               size: 42,
               color: Colors.grey[800],
@@ -368,14 +375,14 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 5),
 
             /// **Palette Size Selection**
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 25),
               child: Text(
                 "COLOUR PALETTE SIZE",
-                style: TextStyle(fontFamily: 'Avenir', fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontFamily: 'Avenir', fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
 
@@ -422,6 +429,76 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
             ),
             const SizedBox(height: 16),
 
+            /// **Color Theory Selection**
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 25, vertical: 8),
+              child: Text(
+                "COLOR THEORY",
+                style: TextStyle(fontFamily: 'Avenir', fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _colorSchemes.map((scheme) {
+                    final isSelected = (scheme == _selectedColorScheme);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _selectedColorScheme = scheme);
+                          if (scheme != 'custom') {
+                            _generateTheoryBasedPalette();
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.black : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            scheme.capitalize(),
+                            style: TextStyle(
+                              fontFamily: 'Avenir',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: isSelected ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+
+            if (_colorTheoryTip != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Text(
+                    _colorTheoryTip!,
+                    style: TextStyle(
+                      fontFamily: 'Avenir',
+                      fontSize: 12,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ),
+              ),
+
             /// **Draggable Color Tiles**
             Expanded(
               child: Padding(
@@ -440,6 +517,11 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                       }
                       final ColorTile tile = _palette.removeAt(oldIndex);
                       _palette.insert(newIndex, tile);
+
+                      // If we're in a color theory mode, update the base color if the first tile changed
+                      if (_selectedColorScheme != 'custom') {
+                        _baseTheoryColor = _palette[0].color;
+                      }
                     });
                   },
                 ),
@@ -447,7 +529,6 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
             ),
             const SizedBox(height: 16),
             // Available wardrobe colors
-
 
             /// **Bottom Buttons**
             Padding(
@@ -464,9 +545,11 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5),
                     ),
-                    label: const Text(
-                      "GENERATE",
-                      style: TextStyle(
+                    label: Text(
+                      _selectedColorScheme == 'custom'
+                          ? "GENERATE"
+                          : "GENERATE ${_selectedColorScheme.toUpperCase()}",
+                      style: const TextStyle(
                         fontFamily: 'Avenir',
                         fontSize: 14,
                       ),
@@ -640,7 +723,16 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                                 isLocked: _palette[i].isLocked,
                                 itemName: colorTile.itemName,
                               );
+
+                              // If this is the first color and we're in a color theory mode,
+                              // update the base color
+                              if (i == 0 && _selectedColorScheme != 'custom') {
+                                _baseTheoryColor = colorTile.color;
+                                // Generate new palette based on this color
+                                _generateTheoryBasedPalette();
+                              }
                             });
+                            _colorTheoryTip = _analyzePalette();
                             Navigator.pop(context);
                           },
                           child: Container(
@@ -676,6 +768,12 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   Future<void> _generatePalette() async {
     print('Wardrobe colors count: ${_wardrobeColors.length}');
     print('Use grey palette: $_useGreyPalette');
+
+    // If a color theory scheme is selected, use that instead
+    if (_selectedColorScheme != 'custom') {
+      _generateTheoryBasedPalette();
+      return;
+    }
 
     // Only use grey palette if there are no wardrobe colors
     if (_wardrobeColors.isEmpty) {
@@ -726,6 +824,266 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         (color1.green - color2.green).abs() <= threshold &&
         (color1.blue - color2.blue).abs() <= threshold;
   }
+
+  // Convert Color to HSL values
+  Map<String, double> _colorToHSL(Color color) {
+    // Convert RGB to HSL
+    final r = color.red / 255;
+    final g = color.green / 255;
+    final b = color.blue / 255;
+
+    final max = math.max(r, math.max(g, b));
+    final min = math.min(r, math.min(g, b));
+
+    double h = 0, s = 0, l = (max + min) / 2;
+
+    if (max != min) {
+      final d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+      if (max == r) {
+        h = (g - b) / d + (g < b ? 6 : 0);
+      } else if (max == g) {
+        h = (b - r) / d + 2;
+      } else if (max == b) {
+        h = (r - g) / d + 4;
+      }
+
+      h /= 6;
+    }
+
+    return {'h': h * 360, 's': s, 'l': l};
+  }
+
+  // Convert HSL to Color
+  Color _hslToColor(double h, double s, double l) {
+    // Convert HSL to RGB
+    double r, g, b;
+
+    if (s == 0) {
+      r = g = b = l;
+    } else {
+      final q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      final p = 2 * l - q;
+
+      r = _hueToRGB(p, q, h + 1/3);
+      g = _hueToRGB(p, q, h);
+      b = _hueToRGB(p, q, h - 1/3);
+    }
+
+    return Color.fromARGB(
+      255,
+      (r * 255).round(),
+      (g * 255).round(),
+      (b * 255).round(),
+    );
+  }
+
+  double _hueToRGB(double p, double q, double t) {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  }
+
+  // Replace the _generateTheoryBasedPalette method with this updated version that introduces variation
+  void _generateTheoryBasedPalette() {
+    if (_wardrobeColors.isEmpty) {
+      _showGreyPaletteNotification("No wardrobe colors available for color theory.");
+      return;
+    }
+
+    // Reset color theory tip
+    _colorTheoryTip = null;
+
+    // Choose a base color from wardrobe or current palette if not already set
+    if (_baseTheoryColor == null || _selectedColorScheme == 'custom') {
+      if (_palette.isNotEmpty && !_useGreyPalette) {
+        // Use the first unlocked color or the first color if all are locked
+        int baseIndex = _palette.indexWhere((tile) => !tile.isLocked);
+        if (baseIndex == -1) baseIndex = 0;
+        _baseTheoryColor = _palette[baseIndex].color;
+      } else {
+        // Choose a random color from wardrobe
+        _baseTheoryColor = _wardrobeColors[math.Random().nextInt(_wardrobeColors.length)].color;
+      }
+    }
+
+    // Convert to HSL for easier manipulation
+    final hsl = _colorToHSL(_baseTheoryColor!);
+
+    // Generate new palette based on selected scheme
+    List<Color> newColors = [];
+    final random = math.Random();
+
+    switch (_selectedColorScheme) {
+      case 'monochromatic':
+      // Create variations with same hue, different saturation/lightness
+      // Add randomness to saturation and lightness while keeping the hue constant
+        newColors = [
+          _baseTheoryColor!, // Original color always stays the same
+          _hslToColor(
+              hsl['h']! / 360,
+              math.min(1.0, hsl['s']! * (0.6 + random.nextDouble() * 0.4)),
+              math.min(0.9, hsl['l']! * (1.2 + random.nextDouble() * 0.3))
+          ), // Lighter with randomness
+          _hslToColor(
+              hsl['h']! / 360,
+              math.min(1.0, hsl['s']! * (1.0 + random.nextDouble() * 0.4)),
+              math.max(0.1, hsl['l']! * (0.7 + random.nextDouble() * 0.3))
+          ), // Darker with randomness
+          _hslToColor(
+              hsl['h']! / 360,
+              math.min(1.0, hsl['s']! * (0.4 + random.nextDouble() * 0.3)),
+              math.min(0.95, hsl['l']! * (1.0 + random.nextDouble() * 0.2))
+          ), // Desaturated with randomness
+        ];
+        _colorTheoryTip = "Monochromatic: These colors are all variations of the same hue, creating a harmonious and cohesive look.";
+        break;
+
+      case 'complementary':
+      // Create a complementary color (opposite on color wheel) and variations
+      // Add slight randomness to the complementary hue
+        double complementaryHue = (hsl['h']! + 180 + (random.nextDouble() * 20 - 10)) % 360;
+        newColors = [
+          _baseTheoryColor!, // Original color always stays the same
+          _hslToColor(
+              complementaryHue / 360,
+              math.min(1.0, hsl['s']! * (0.9 + random.nextDouble() * 0.2)),
+              math.min(0.9, hsl['l']! * (0.9 + random.nextDouble() * 0.2))
+          ), // Complementary with slight variation
+          _hslToColor(
+              hsl['h']! / 360,
+              math.min(1.0, hsl['s']! * (0.7 + random.nextDouble() * 0.3)),
+              math.min(0.9, hsl['l']! * (1.1 + random.nextDouble() * 0.2))
+          ), // Lighter original with randomness
+          _hslToColor(
+              complementaryHue / 360,
+              math.min(1.0, hsl['s']! * (0.7 + random.nextDouble() * 0.3)),
+              math.min(0.9, hsl['l']! * (1.1 + random.nextDouble() * 0.2))
+          ), // Lighter complementary with randomness
+        ];
+        _colorTheoryTip = "Complementary: These colors are opposite each other on the color wheel, creating a vibrant contrast.";
+        break;
+
+      case 'analogous':
+      // Create colors adjacent on the color wheel with some randomness
+        double angle1 = -30 + (random.nextDouble() * 10 - 5); // -35 to -25 degrees
+        double angle2 = 30 + (random.nextDouble() * 10 - 5);  // 25 to 35 degrees
+        double angle3 = 60 + (random.nextDouble() * 10 - 5);  // 55 to 65 degrees
+
+        newColors = [
+          _baseTheoryColor!, // Original color always stays the same
+          _hslToColor(
+              ((hsl['h']! + angle1) + 360) % 360 / 360,
+              math.min(1.0, hsl['s']! * (0.9 + random.nextDouble() * 0.2)),
+              math.min(0.9, hsl['l']! * (0.9 + random.nextDouble() * 0.2))
+          ), // Adjacent with variation
+          _hslToColor(
+              ((hsl['h']! + angle2) + 360) % 360 / 360,
+              math.min(1.0, hsl['s']! * (0.9 + random.nextDouble() * 0.2)),
+              math.min(0.9, hsl['l']! * (0.9 + random.nextDouble() * 0.2))
+          ), // Adjacent with variation
+          _hslToColor(
+              ((hsl['h']! + angle3) + 360) % 360 / 360,
+              math.min(1.0, hsl['s']! * (0.9 + random.nextDouble() * 0.2)),
+              math.min(0.9, hsl['l']! * (0.9 + random.nextDouble() * 0.2))
+          ), // Adjacent with variation
+        ];
+        _colorTheoryTip = "Analogous: These colors are adjacent to each other on the color wheel, creating a harmonious and natural look.";
+        break;
+
+      default: // 'custom'
+      // Just use random wardrobe colors
+        _generatePalette();
+        return;
+    }
+
+    // Update palette with new colors
+    setState(() {
+      for (int i = 0; i < _palette.length; i++) {
+        if (!_palette[i].isLocked && i < newColors.length) {
+          _palette[i] = ColorTile(
+            color: newColors[i],
+            itemName: i == 0 ? "Base Color" : "${_selectedColorScheme.capitalize()} ${i}",
+          );
+        }
+      }
+
+      // Show tip if available
+      if (_colorTheoryTip != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(_colorTheoryTip!),
+                backgroundColor: Colors.black87,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+        });
+      }
+    });
+  }
+
+  // Analyze current palette and provide color theory suggestions
+  String _analyzePalette() {
+    if (_palette.isEmpty || _paletteSize < 2) {
+      return "Add more colors to get color theory suggestions.";
+    }
+
+    List<Map<String, double>> hslColors = [];
+    for (int i = 0; i < _paletteSize; i++) {
+      hslColors.add(_colorToHSL(_palette[i].color));
+    }
+
+    // Check if monochromatic
+    bool isMonochromatic = true;
+    double baseHue = hslColors[0]['h']!;
+    for (int i = 1; i < hslColors.length; i++) {
+      if ((hslColors[i]['h']! - baseHue).abs() > 15) {
+        isMonochromatic = false;
+        break;
+      }
+    }
+
+    if (isMonochromatic) {
+      return "Your palette is monochromatic. Consider adding a complementary color for more contrast.";
+    }
+
+    // Check if analogous
+    bool isAnalogous = true;
+    for (int i = 1; i < hslColors.length; i++) {
+      double hueDiff = (hslColors[i]['h']! - baseHue).abs();
+      if (hueDiff > 60 && hueDiff < 300) {
+        isAnalogous = false;
+        break;
+      }
+    }
+
+    if (isAnalogous) {
+      return "Your palette is analogous. These colors work well together for a harmonious look.";
+    }
+
+    // Check if complementary
+    bool hasComplementary = false;
+    for (int i = 1; i < hslColors.length; i++) {
+      double hueDiff = (hslColors[i]['h']! - baseHue).abs();
+      if (hueDiff > 150 && hueDiff < 210) {
+        hasComplementary = true;
+        break;
+      }
+    }
+
+    if (hasComplementary) {
+      return "Your palette includes complementary colors, which create a vibrant contrast.";
+    }
+
+    return "Your custom palette combines multiple color relationships.";
+  }
 }
 
 Future<void> _checkItemsExistence() async {
@@ -757,3 +1115,8 @@ class ColorTile {
   ColorTile({required this.color, this.isLocked = false, this.itemName});
 }
 
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${this.substring(1)}";
+  }
+}

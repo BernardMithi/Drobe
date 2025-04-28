@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:drobe/settings/profile.dart';
-import 'fabricTipDetail.dart';
 import 'package:drobe/models/fabricModel.dart';
-import 'package:drobe/settings/profileAvatar.dart';
-import 'package:drobe/auth/authService.dart';
+import 'package:drobe/Fabrics/fabricTipDetail.dart';
 
 class FabricTipsPage extends StatefulWidget {
   const FabricTipsPage({Key? key}) : super(key: key);
@@ -15,20 +12,11 @@ class FabricTipsPage extends StatefulWidget {
 class _FabricTipsPageState extends State<FabricTipsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String _selectedCategory = 'All';
-  bool _isLoading = false;
+  List<String> _selectedCategories = [];
 
-  // List of available categories
-  final List<String> _categories = [
-    'All',
-    'Cotton',
-    'Wool',
-    'Silk',
-    'Synthetic',
-    'Denim',
-    'Leather',
-    'Linen',
-    'Cashmere',
+  final List<String> _allCategories = [
+    'cotton', 'wool', 'silk', 'denim', 'synthetic', 'leather', 'linen',
+    'cashmere', 'care', 'washing', 'sustainability', 'capsule wardrobe'
   ];
 
   @override
@@ -36,7 +24,7 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
     super.initState();
     _searchController.addListener(() {
       setState(() {
-        _searchQuery = _searchController.text;
+        _searchQuery = _searchController.text.toLowerCase();
       });
     });
   }
@@ -47,21 +35,30 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
     super.dispose();
   }
 
-  // Filter tips based on search query and selected category
   List<FabricTip> get filteredTips {
     return fabricTips.where((tip) {
       // Filter by search query
-      final matchesSearch = _searchQuery.isEmpty ||
-          tip.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          tip.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          tip.content.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesQuery = _searchQuery.isEmpty ||
+          tip.title.toLowerCase().contains(_searchQuery) ||
+          tip.description.toLowerCase().contains(_searchQuery) ||
+          tip.content.toLowerCase().contains(_searchQuery);
 
-      // Filter by category
-      final matchesCategory = _selectedCategory == 'All' ||
-          tip.categories.contains(_selectedCategory.toLowerCase());
+      // Filter by selected categories
+      final matchesCategories = _selectedCategories.isEmpty ||
+          tip.categories.any((category) => _selectedCategories.contains(category));
 
-      return matchesSearch && matchesCategory;
+      return matchesQuery && matchesCategories;
     }).toList();
+  }
+
+  void _toggleCategory(String category) {
+    setState(() {
+      if (_selectedCategories.contains(category)) {
+        _selectedCategories.remove(category);
+      } else {
+        _selectedCategories.add(category);
+      }
+    });
   }
 
   @override
@@ -73,151 +70,115 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ProfilePage()),
-                ).then((_) {
-                  // Refresh when returning from profile page
-                  setState(() {});
-                });
-              },
-              child: FutureBuilder<Map<String, String>>(
-                future: AuthService().getCurrentUser(),
-                builder: (context, snapshot) {
-                  final userData = snapshot.data ?? {'id': '', 'name': '', 'email': ''};
-                  return ProfileAvatar(
-                    key: ValueKey('outfits_avatar_${DateTime.now().millisecondsSinceEpoch}'),
-                    size: 42,
-                    userId: userData['id'] ?? '',
-                    name: userData['name'] ?? '',
-                    email: userData['email'] ?? '',
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
       ),
       body: Column(
         children: [
           // Search bar
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search fabric tips',
+                hintText: 'Search fabric tips...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
                 ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
           ),
 
-          // Category filter
+          // Category filters
           SizedBox(
             height: 50,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                final isSelected = category == _selectedCategory;
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    backgroundColor: Colors.grey[300],
-                    selectedColor: Colors.grey[400],
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedCategory = category;
-                      });
-                    },
-                  ),
-                );
-              },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _allCategories.map((category) {
+                  final isSelected = _selectedCategories.contains(category);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: FilterChip(
+                      label: Text(
+                        category,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black87,
+                          fontSize: 12,
+                        ),
+                      ),
+                      selected: isSelected,
+                      onSelected: (_) => _toggleCategory(category),
+                      backgroundColor: Colors.grey.shade200,
+                      selectedColor: Colors.black87,
+                      checkmarkColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ),
 
           // Tips list
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filteredTips.isEmpty
-                ? _buildEmptyState()
-                : _buildTipsList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.article_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No fabric tips found',
-            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-          ),
-          if (_searchQuery.isNotEmpty || _selectedCategory != 'All')
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _searchController.clear();
-                    _selectedCategory = 'All';
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[300],
-                  foregroundColor: Colors.black,
-                ),
-                child: const Text('Clear filters'),
+            child: filteredTips.isEmpty
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.search_off,
+                    size: 64,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No fabric tips found',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Try adjusting your search or filters',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
               ),
+            )
+                : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: filteredTips.length,
+              itemBuilder: (context, index) {
+                final tip = filteredTips[index];
+                return _buildTipCard(context, tip);
+              },
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTipsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: filteredTips.length,
-      itemBuilder: (context, index) {
-        final tip = filteredTips[index];
-        return _buildTipCard(tip);
-      },
-    );
-  }
-
-  Widget _buildTipCard(FabricTip tip) {
+  Widget _buildTipCard(BuildContext context, FabricTip tip) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -231,19 +192,65 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-              child: Image.network(
-                tip.imageUrl,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 180,
-                  width: double.infinity,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
-                ),
+            SizedBox(
+              height: 180,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    tip.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey.shade200,
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  // Gradient overlay
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
+                          stops: const [0.6, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Title overlay
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        tip.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(
+                              offset: Offset(1, 1),
+                              blurRadius: 3,
+                              color: Colors.black45,
+                            ),
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -253,44 +260,98 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title
-                  Text(
-                    tip.title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
                   // Description
                   Text(
                     tip.description,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: Colors.grey.shade800,
+                      height: 1.4,
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+
+                  // Categories and metadata
+                  Row(
+                    children: [
+                      // Author avatar
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.grey.shade300,
+                        child: Text(
+                          tip.author.substring(0, 1),
+                          style: TextStyle(
+                            color: Colors.grey.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Author name
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tip.author,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              tip.date,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Read more button
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FabricTipDetailPage(tip: tip),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.arrow_forward, size: 16),
+                        label: const Text('Read More'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.black87,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ),
 
                   // Categories
+                  const SizedBox(height: 12),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: tip.categories.map((category) {
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: tip.categories.take(3).map((category) {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(4),
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           category,
                           style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[800],
+                            fontSize: 11,
+                            color: Colors.grey.shade800,
                           ),
                         ),
                       );
@@ -305,4 +366,3 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
     );
   }
 }
-
