@@ -67,4 +67,3 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return const Homepage();
   }
 }
-

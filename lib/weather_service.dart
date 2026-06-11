@@ -45,7 +45,8 @@ class WeatherService {
 
         return {
           'temperature': data['main']['temp'],
-          'description': data['weather'][0]['description'].toString().toUpperCase(),
+          'description':
+              data['weather'][0]['description'].toString().toUpperCase(),
           'location': "${data['name']}, ${data['sys']['country']}",
           'conditionCode': data['weather'][0]['id'],
           'condition': data['weather'][0]['main'],
@@ -58,10 +59,7 @@ class WeatherService {
         };
       }
     } catch (e) {
-      return {
-        'success': false,
-        'message': "Error fetching weather: $e"
-      };
+      return {'success': false, 'message': "Error fetching weather: $e"};
     }
   }
 
@@ -69,7 +67,8 @@ class WeatherService {
   Future<Map<String, dynamic>> getCurrentWeather() async {
     try {
       final position = await getLocation();
-      final weatherData = await fetchWeather(position.latitude, position.longitude);
+      final weatherData =
+          await fetchWeather(position.latitude, position.longitude);
 
       if (weatherData['success'] == true) {
         return {
@@ -144,4 +143,3 @@ class WeatherService {
     }
   }
 }
-

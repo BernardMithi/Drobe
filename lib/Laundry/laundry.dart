@@ -38,7 +38,8 @@ class _LaundryPageState extends State<LaundryPage> {
       if (_currentUserId.isEmpty) {
         print('Error: Unable to get current user ID');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: Unable to get user information')),
+          const SnackBar(
+              content: Text('Error: Unable to get user information')),
         );
         setState(() {
           _isLoading = false;
@@ -69,9 +70,7 @@ class _LaundryPageState extends State<LaundryPage> {
       // Filter for items in laundry that belong to the current user
       final List<Item> laundryItems = [];
       for (var item in box.values) {
-        if (item is Item &&
-            item.inLaundry &&
-            item.userId == _currentUserId) {
+        if (item is Item && item.inLaundry && item.userId == _currentUserId) {
           laundryItems.add(item);
         }
       }
@@ -83,7 +82,8 @@ class _LaundryPageState extends State<LaundryPage> {
         _selectedItems.clear();
       });
 
-      debugPrint('Loaded ${_laundryItems.length} laundry items for user $_currentUserId');
+      debugPrint(
+          'Loaded ${_laundryItems.length} laundry items for user $_currentUserId');
     } catch (e) {
       print('Error loading laundry items: $e');
       setState(() {
@@ -246,7 +246,8 @@ class _LaundryPageState extends State<LaundryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('LAUNDRY', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text('LAUNDRY',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w300)),
         centerTitle: true,
         actions: [
           Padding(
@@ -264,9 +265,11 @@ class _LaundryPageState extends State<LaundryPage> {
               child: FutureBuilder<Map<String, String>>(
                 future: AuthService().getCurrentUser(),
                 builder: (context, snapshot) {
-                  final userData = snapshot.data ?? {'id': '', 'name': '', 'email': ''};
+                  final userData =
+                      snapshot.data ?? {'id': '', 'name': '', 'email': ''};
                   return ProfileAvatar(
-                    key: ValueKey('laundry_avatar_${DateTime.now().millisecondsSinceEpoch}'),
+                    key: ValueKey(
+                        'laundry_avatar_${DateTime.now().millisecondsSinceEpoch}'),
                     size: 42,
                     userId: userData['id'] ?? '',
                     name: userData['name'] ?? '',
@@ -282,7 +285,8 @@ class _LaundryPageState extends State<LaundryPage> {
         children: [
           // Header with item count
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -290,7 +294,7 @@ class _LaundryPageState extends State<LaundryPage> {
                   'Items in Laundry: ${_laundryItems.length}',
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w300,
                   ),
                 ),
                 Text(
@@ -306,12 +310,14 @@ class _LaundryPageState extends State<LaundryPage> {
 
           // Action buttons - moved to top for better accessibility
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _selectedItems.isNotEmpty ? _washSelectedItems : null,
+                    onPressed:
+                        _selectedItems.isNotEmpty ? _washSelectedItems : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[800],
                       foregroundColor: Colors.white,
@@ -347,8 +353,8 @@ class _LaundryPageState extends State<LaundryPage> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _laundryItems.isEmpty
-                ? _buildEmptyState()
-                : _buildLaundryGrid(),
+                    ? _buildEmptyState()
+                    : _buildLaundryGrid(),
           ),
         ],
       ),
@@ -366,7 +372,7 @@ class _LaundryPageState extends State<LaundryPage> {
             'NO ITEMS IN LAUNDRY',
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w300,
               letterSpacing: 1.2,
             ),
           ),
@@ -437,8 +443,10 @@ class _LaundryPageState extends State<LaundryPage> {
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
-                            errorBuilder: (context, error, stackTrace) => const Center(
-                              child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Center(
+                              child: Icon(Icons.broken_image,
+                                  size: 64, color: Colors.grey),
                             ),
                           ),
                           if (isSelected)
@@ -451,7 +459,8 @@ class _LaundryPageState extends State<LaundryPage> {
                                   color: Colors.grey[300],
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.check, color: Colors.black, size: 20),
+                                child: const Icon(Icons.check,
+                                    color: Colors.black, size: 20),
                               ),
                             ),
                         ],
@@ -465,8 +474,10 @@ class _LaundryPageState extends State<LaundryPage> {
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
-                            errorBuilder: (context, error, stackTrace) => const Center(
-                              child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Center(
+                              child: Icon(Icons.broken_image,
+                                  size: 64, color: Colors.grey),
                             ),
                           ),
                           if (isSelected)
@@ -479,7 +490,8 @@ class _LaundryPageState extends State<LaundryPage> {
                                   color: Colors.grey[300],
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.check, color: Colors.black, size: 20),
+                                child: const Icon(Icons.check,
+                                    color: Colors.black, size: 20),
                               ),
                             ),
                         ],
@@ -493,7 +505,8 @@ class _LaundryPageState extends State<LaundryPage> {
                         Container(
                           color: Colors.grey[200],
                           child: const Center(
-                            child: Icon(Icons.local_laundry_service, size: 64, color: Colors.grey),
+                            child: Icon(Icons.local_laundry_service,
+                                size: 64, color: Colors.grey),
                           ),
                         ),
                         if (isSelected)
@@ -506,7 +519,8 @@ class _LaundryPageState extends State<LaundryPage> {
                                 color: Colors.grey[300],
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.check, color: Colors.black, size: 20),
+                              child: const Icon(Icons.check,
+                                  color: Colors.black, size: 20),
                             ),
                           ),
                       ],
@@ -526,8 +540,9 @@ class _LaundryPageState extends State<LaundryPage> {
                   Text(
                     item.name,
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontFamily: 'BarlowCondensed',
+                      fontWeight: FontWeight.w300,
+                      fontSize: 16,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -536,7 +551,9 @@ class _LaundryPageState extends State<LaundryPage> {
                   Text(
                     item.category,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontFamily: 'BarlowCondensed',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w300,
                       color: Colors.grey[600],
                     ),
                     maxLines: 1,
@@ -551,4 +568,3 @@ class _LaundryPageState extends State<LaundryPage> {
     );
   }
 }
-

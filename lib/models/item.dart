@@ -92,4 +92,3 @@ class Item extends HiveObject {
     );
   }
 }
-

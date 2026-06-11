@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:intl/intl.dart';
 import 'addLookbookItem.dart';
+import 'package:drobe/theme/drobe_icon.dart';
 
 class LookbookDetailPage extends StatefulWidget {
   final String id;
@@ -16,10 +17,47 @@ class LookbookDetailPage extends StatefulWidget {
   State<LookbookDetailPage> createState() => _LookbookDetailPageState();
 }
 
+class _TwoLineMenuIcon extends StatelessWidget {
+  const _TwoLineMenuIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 18,
+      height: 14,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Container(
+            width: 18,
+            height: 2,
+            decoration: BoxDecoration(
+              color: const Color(0xFF242424),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: 12,
+            height: 2,
+            decoration: BoxDecoration(
+              color: const Color(0xFF242424),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LookbookDetailPageState extends State<LookbookDetailPage> {
   LookbookItem? _item;
   bool _isLoading = true;
   String? _resolvedImagePath;
+  List<LookbookItem> _similarItems = [];
+  final Map<String, String?> _similarPaths = {};
 
   @override
   void initState() {
@@ -33,11 +71,9 @@ class _LookbookDetailPageState extends State<LookbookDetailPage> {
         _isLoading = true;
       });
 
-      // Load the lookbook item
       final item = await LookbookStorageService.getItem(widget.id);
 
       if (item != null && item.imageUrl != null) {
-        // Resolve the image path
         _resolvedImagePath = await _resolveFilePath(item.imageUrl!);
       }
 
@@ -45,11 +81,50 @@ class _LookbookDetailPageState extends State<LookbookDetailPage> {
         _item = item;
         _isLoading = false;
       });
+
+      if (item != null) {
+        _loadSimilarItems(item);
+      }
     } catch (e) {
       print('Error loading lookbook item: $e');
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadSimilarItems(LookbookItem current) async {
+    try {
+      final all = await LookbookStorageService.getAllItems();
+      final currentTags = current.tags.map((t) => t.toLowerCase()).toSet();
+
+      final similar = all.where((item) {
+        if (item.id == current.id) return false;
+        if (currentTags.isEmpty) return false;
+        return item.tags.any((t) => currentTags.contains(t.toLowerCase()));
+      }).toList();
+
+      // Sort by most shared tags
+      similar.sort((a, b) {
+        final aShared = a.tags.where((t) => currentTags.contains(t.toLowerCase())).length;
+        final bShared = b.tags.where((t) => currentTags.contains(t.toLowerCase())).length;
+        return bShared.compareTo(aShared);
+      });
+
+      // Resolve paths for each
+      for (final item in similar) {
+        if (item.imageUrl != null) {
+          _similarPaths[item.id!] = await _resolveFilePath(item.imageUrl!);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _similarItems = similar;
+        });
+      }
+    } catch (e) {
+      print('Error loading similar items: $e');
     }
   }
 
@@ -96,7 +171,8 @@ class _LookbookDetailPageState extends State<LookbookDetailPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Inspiration'),
-        content: const Text('Are you sure you want to delete this inspiration?'),
+        content:
+            const Text('Are you sure you want to delete this inspiration?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -167,8 +243,19 @@ class _LookbookDetailPageState extends State<LookbookDetailPage> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('LOOKBOOK', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF242424),
+          elevation: 0,
+          title: const Text(
+            'LOOKBOOK',
+            style: TextStyle(
+              fontFamily: 'BarlowCondensed',
+              fontSize: 20,
+              fontWeight: FontWeight.w300,
+            ),
+          ),
           centerTitle: true,
         ),
         body: const Center(child: CircularProgressIndicator()),
@@ -177,8 +264,19 @@ class _LookbookDetailPageState extends State<LookbookDetailPage> {
 
     if (_item == null) {
       return Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('LOOKBOOK', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF242424),
+          elevation: 0,
+          title: const Text(
+            'LOOKBOOK',
+            style: TextStyle(
+              fontFamily: 'BarlowCondensed',
+              fontSize: 20,
+              fontWeight: FontWeight.w300,
+            ),
+          ),
           centerTitle: true,
         ),
         body: const Center(
@@ -188,167 +286,390 @@ class _LookbookDetailPageState extends State<LookbookDetailPage> {
     }
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('LOOKBOOK', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF242424),
+        elevation: 0,
+        title: const Text(
+          'LOOKBOOK',
+          style: TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 20,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share,size: 20),
-            onPressed: _shareItem,
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit,size: 20),
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AddLookbookItemPage(existingItem: _item),
-                ),
-              );
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: PopupMenuButton<String>(
+              tooltip: 'Options',
+              color: Colors.white,
+              surfaceTintColor: Colors.white,
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFFE4DDD5)),
+              ),
+              position: PopupMenuPosition.under,
+              onSelected: (value) async {
+                switch (value) {
+                  case 'share':
+                    _shareItem();
+                    break;
+                  case 'edit':
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            AddLookbookItemPage(existingItem: _item),
+                      ),
+                    );
 
-              if (result == true) {
-                _loadItem();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete,size: 20),
-            onPressed: _deleteItem,
+                    if (result == true) {
+                      _loadItem();
+                    }
+                    break;
+                  case 'delete':
+                    _deleteItem();
+                    break;
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem<String>(
+                  value: 'share',
+                  child: Text('Share'),
+                ),
+                PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Text('Edit'),
+                ),
+                PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Text('Delete'),
+                ),
+              ],
+              child: const SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: _TwoLineMenuIcon(),
+                ),
+              ),
+            ),
           ),
         ],
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image with padding
-            Padding(
-              padding: const EdgeInsets.all(12.0), // Reduced padding by half
-              child: _resolvedImagePath != null
-                  ? ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(
-                    minHeight: 200,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: _resolvedImagePath!.startsWith('http')
-                      ? Image.network(
-                    _resolvedImagePath!,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => const Center(
-                      child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                    ),
-                  )
-                      : Image.file(
-                    File(_resolvedImagePath!),
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => const Center(
-                      child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                    ),
-                  ),
-                ),
-              )
-                  : Container(
+            // Hero image with name + date overlay
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.55,
                 width: double.infinity,
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: const Center(
-                  child: Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _resolvedImagePath != null
+                        ? _resolvedImagePath!.startsWith('http')
+                            ? Image.network(
+                                _resolvedImagePath!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                  color: const Color(0xFFF2EEE8),
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, size: 48, color: Color(0xFFBDB5AB)),
+                                  ),
+                                ),
+                              )
+                            : Image.file(
+                                File(_resolvedImagePath!),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                  color: const Color(0xFFF2EEE8),
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, size: 48, color: Color(0xFFBDB5AB)),
+                                  ),
+                                ),
+                              )
+                        : Container(
+                            color: const Color(0xFFF2EEE8),
+                            child: const Center(
+                              child: Icon(Icons.image_not_supported, size: 48, color: Color(0xFFBDB5AB)),
+                            ),
+                          ),
+                    // Gradient overlay
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.58),
+                            ],
+                            stops: const [0.45, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Name + date at bottom of image
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 36, 18, 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _item!.name,
+                              style: const TextStyle(
+                                fontFamily: 'BarlowCondensed',
+                                fontSize: 28,
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white,
+                                height: 1.05,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              DateFormat('MMM d, yyyy').format(_item!.createdAt),
+                              style: TextStyle(
+                                fontFamily: 'BarlowCondensed',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white.withOpacity(0.72),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+            const SizedBox(height: 18),
 
-            // Item details
-            Padding(
-                padding: const EdgeInsets.only(left: 25.0, right: 25.0, bottom: 25.0),              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Tags
+            if (_item!.tags.isNotEmpty) ...[
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _item!.tags.map((tag) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2EDE8),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      tag,
+                      style: const TextStyle(
+                        fontFamily: 'BarlowCondensed',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w300,
+                        color: Color(0xFF5F5A54),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Notes
+            if (_item!.notes != null && _item!.notes!.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F5F1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'NOTES',
+                      style: TextStyle(
+                        fontFamily: 'BarlowCondensed',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 1.8,
+                        color: Color(0xFFADA59C),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _item!.notes!,
+                      style: const TextStyle(
+                        fontFamily: 'BarlowCondensed',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w300,
+                        color: Color(0xFF4A4540),
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            // Source
+            if (_item!.source != null && _item!.source!.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F5F1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'SOURCE',
+                            style: TextStyle(
+                              fontFamily: 'BarlowCondensed',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                              letterSpacing: 1.8,
+                              color: Color(0xFFADA59C),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _item!.source!,
+                            style: const TextStyle(
+                              fontFamily: 'BarlowCondensed',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w300,
+                              color: Color(0xFF4A4540),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.arrow_forward_ios, size: 13, color: Color(0xFFBDB5AB)),
+                  ],
+                ),
+              ),
+            ],
+
+            // Similar looks
+            if (_similarItems.isNotEmpty) ...[
+              const SizedBox(height: 28),
+              Row(
                 children: [
-                  // Name and date
-                  Text(
-                    _item!.name,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Added on ${DateFormat('MMMM d, yyyy').format(_item!.createdAt)}',
+                  Container(width: 28, height: 1.5, color: const Color(0xFFD8CEC3)),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'SIMILAR LOOKS',
                     style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
+                      fontFamily: 'BarlowCondensed',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 1.8,
+                      color: Color(0xFF8A847D),
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // Tags
-                  if (_item!.tags.isNotEmpty) ...[
-                    const Text(
-                      'Tags',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _item!.tags.map((tag) {
-                        return Chip(
-                          label: Text(tag),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Notes
-                  if (_item!.notes != null && _item!.notes!.isNotEmpty) ...[
-                    const Text(
-                      'Notes',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      child: Text(_item!.notes!),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Source
-                  if (_item!.source != null && _item!.source!.isNotEmpty) ...[
-                    const Text(
-                      'Source',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(_item!.source!),
-                    const SizedBox(height: 16),
-                  ],
                 ],
               ),
-            ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 190,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _similarItems.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final similar = _similarItems[index];
+                    final resolvedPath = _similarPaths[similar.id];
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LookbookDetailPage(id: similar.id!),
+                          ),
+                        );
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          width: 140,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // Image
+                              resolvedPath != null
+                                  ? (resolvedPath.startsWith('http')
+                                      ? Image.network(resolvedPath, fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF2EEE8)))
+                                      : Image.file(File(resolvedPath), fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF2EEE8))))
+                                  : Container(color: const Color(0xFFF2EEE8)),
+                              // Gradient
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [Colors.transparent, Colors.black.withOpacity(0.55)],
+                                      stops: const [0.5, 1.0],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Name
+                              Positioned(
+                                bottom: 10,
+                                left: 10,
+                                right: 10,
+                                child: Text(
+                                  similar.name,
+                                  style: const TextStyle(
+                                    fontFamily: 'BarlowCondensed',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w300,
+                                    color: Colors.white,
+                                    height: 1.2,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 }
-

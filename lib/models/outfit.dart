@@ -31,7 +31,8 @@ class Outfit extends HiveObject {
   String? userId;
 
   // Non-persisted field, computed from colorCodes
-  List<Color> get colorPalette => colorCodes.map((code) => Color(code)).toList();
+  List<Color> get colorPalette =>
+      colorCodes.map((code) => Color(code)).toList();
 
   Outfit({
     this.id,
@@ -42,8 +43,7 @@ class Outfit extends HiveObject {
     List<Color>? colorPalette,
     List<String>? colorPaletteStrings,
     this.userId,
-  }) :
-        accessories = accessories
+  })  : accessories = accessories
             .where((item) => item != null)
             .map((item) => item as String)
             .toList(),
@@ -77,7 +77,8 @@ class Outfit extends HiveObject {
       clothes: clothes ?? Map<String, String?>.from(this.clothes),
       accessories: accessories ?? List<String?>.from(this.accessories),
       colorPalette: colorPalette ?? this.colorPalette,
-      colorPaletteStrings: colorPaletteStrings ?? List<String>.from(this.colorPaletteStrings),
+      colorPaletteStrings:
+          colorPaletteStrings ?? List<String>.from(this.colorPaletteStrings),
       userId: userId ?? this.userId,
     );
   }
@@ -90,7 +91,9 @@ class Outfit extends HiveObject {
         name: map['name'] as String? ?? 'Unnamed Outfit',
         clothes: Map<String, String?>.from(map['clothes'] ?? {}),
         accessories: List<String?>.from(map['accessories'] ?? []),
-        colorPalette: (map['colorCodes'] as List?)?.map((code) => Color(code as int)).toList(),
+        colorPalette: (map['colorCodes'] as List?)
+            ?.map((code) => Color(code as int))
+            .toList(),
         date: map['date'] is DateTime
             ? map['date']
             : DateTime.tryParse(map['date'] as String? ?? '') ?? DateTime.now(),
@@ -122,7 +125,8 @@ class Outfit extends HiveObject {
   }
 
   bool isComplete() {
-    return name.isNotEmpty && clothes.values.any((url) => url != null && url.isNotEmpty);
+    return name.isNotEmpty &&
+        clothes.values.any((url) => url != null && url.isNotEmpty);
   }
 
   @override
@@ -130,4 +134,3 @@ class Outfit extends HiveObject {
     return 'Outfit(id: $id, name: $name, date: $date)';
   }
 }
-

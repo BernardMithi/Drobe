@@ -12,7 +12,8 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SETTINGS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text('SETTINGS',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w300)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -28,7 +29,7 @@ class SettingsPage extends StatelessWidget {
                 context,
                 'Profile',
                 Icons.person,
-                    () => Navigator.push(
+                () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ProfilePage()),
                 ),
@@ -37,9 +38,10 @@ class SettingsPage extends StatelessWidget {
                 context,
                 'Notifications',
                 Icons.notifications,
-                    () => Navigator.push(
+                () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const NotificationsPage()),
+                  MaterialPageRoute(
+                      builder: (context) => const NotificationsPage()),
                 ),
               ),
             ],
@@ -53,16 +55,17 @@ class SettingsPage extends StatelessWidget {
                 context,
                 'Contact Us',
                 Icons.mail,
-                    () => Navigator.push(
+                () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ContactUsPage()),
+                  MaterialPageRoute(
+                      builder: (context) => const ContactUsPage()),
                 ),
               ),
               _buildSettingTile(
                 context,
                 'About',
                 Icons.info,
-                    () => _showAboutDialog(context),
+                () => _showAboutDialog(context),
               ),
             ],
           ),
@@ -75,7 +78,7 @@ class SettingsPage extends StatelessWidget {
                 context,
                 'Reset App Data',
                 Icons.delete_forever,
-                    () => Navigator.push(
+                () => Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const DataManagementPage(),
@@ -94,7 +97,7 @@ class SettingsPage extends StatelessWidget {
                 context,
                 'Sign Out',
                 Icons.exit_to_app,
-                    () => _signOut(context),
+                () => _signOut(context),
                 isDestructive: true,
               ),
             ],
@@ -104,7 +107,8 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(BuildContext context, String title, List<Widget> children) {
+  Widget _buildSection(
+      BuildContext context, String title, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -113,9 +117,9 @@ class SettingsPage extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w300,
+                ),
           ),
         ),
         Card(
@@ -135,19 +139,18 @@ class SettingsPage extends StatelessWidget {
   }
 
   Widget _buildSettingTile(
-      BuildContext context,
-      String title,
-      IconData icon,
-      VoidCallback onTap, {
-        bool isDestructive = false,
-        String? subtitle,
-      }) {
+    BuildContext context,
+    String title,
+    IconData icon,
+    VoidCallback onTap, {
+    bool isDestructive = false,
+    String? subtitle,
+  }) {
     return ListTile(
       leading: Icon(
         icon,
-        color: isDestructive
-            ? Colors.red
-            : Theme.of(context).colorScheme.primary,
+        color:
+            isDestructive ? Colors.red : Theme.of(context).colorScheme.primary,
       ),
       title: Text(
         title,
@@ -176,7 +179,8 @@ class SettingsPage extends StatelessWidget {
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 16),
-            const Text('Drobe helps you organize your wardrobe and create outfits.'),
+            const Text(
+                'Drobe helps you organize your wardrobe and create outfits.'),
             const SizedBox(height: 16),
             const Text('Version: 1.0.0'),
           ],
@@ -207,7 +211,8 @@ class SettingsPage extends StatelessWidget {
               onPressed: () async {
                 Navigator.of(context).pop();
                 try {
-                  await AuthService().logout(); // Use the correct method name from your AuthService
+                  await AuthService()
+                      .logout(); // Use the correct method name from your AuthService
                   // Navigate to login screen or home
                   Navigator.of(context).pushReplacementNamed('/login');
                 } catch (e) {
@@ -224,4 +229,3 @@ class SettingsPage extends StatelessWidget {
     );
   }
 }
-

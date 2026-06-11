@@ -63,13 +63,16 @@ class _WeatherWidgetState extends State<WeatherWidget> {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final conditionCode = data['weather'][0]['id']; // ✅ Get weather condition code
+        final conditionCode =
+            data['weather'][0]['id']; // ✅ Get weather condition code
 
         setState(() {
           temperature = "${data['main']['temp']}°C";
-          weatherDescription = data['weather'][0]['description'].toString().toUpperCase();
+          weatherDescription =
+              data['weather'][0]['description'].toString().toUpperCase();
           location = "${data['name']}, ${data['sys']['country']}";
-          weatherIcon = _getWeatherIcon(conditionCode); // ✅ Assign the correct icon
+          weatherIcon =
+              _getWeatherIcon(conditionCode); // ✅ Assign the correct icon
         });
       } else {
         setState(() {
@@ -133,15 +136,15 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                         Text(
                           temperature,
                           style: const TextStyle(
-                            fontFamily: 'Avenir',
+                            fontFamily: 'BarlowCondensed',
                             fontSize: 28,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w300,
                           ),
                         ),
                         Text(
                           weatherDescription,
                           style: const TextStyle(
-                            fontFamily: 'Avenir',
+                            fontFamily: 'BarlowCondensed',
                             fontSize: 16,
                             color: Colors.grey,
                           ),
@@ -161,18 +164,18 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                   Text(
                     date,
                     style: const TextStyle(
-                      fontFamily: 'Avenir',
+                      fontFamily: 'BarlowCondensed',
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w300,
                       color: Colors.black54,
                     ),
                   ),
                   Text(
                     location,
                     style: const TextStyle(
-                      fontFamily: 'Avenir',
+                      fontFamily: 'BarlowCondensed',
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w300,
                       color: Colors.black87,
                     ),
                   ),

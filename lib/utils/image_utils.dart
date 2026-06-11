@@ -12,7 +12,8 @@ Future<String> saveImagePermanently(File imageFile) async {
   }
 
   // Generate unique filename
-  final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}.${imageFile.path.split('.').last}';
+  final fileName =
+      'img_${DateTime.now().millisecondsSinceEpoch}.${imageFile.path.split('.').last}';
 
   // Full destination path
   final destPath = '${imagesDir.path}/$fileName';
@@ -32,7 +33,6 @@ Future<String> getAbsoluteImagePath(String relativePath) async {
   }
 
   final directory = await getApplicationDocumentsDirectory();
-  return '${directory.path}/$relativePath'.replaceAll('//', '/'); // Ensure no double slashes
+  return '${directory.path}/$relativePath'
+      .replaceAll('//', '/'); // Ensure no double slashes
 }
-
-

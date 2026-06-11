@@ -52,7 +52,7 @@ class _SignupPageState extends State<SignupPage> {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const Homepage()),
-                (route) => false, // Remove all previous routes
+            (route) => false, // Remove all previous routes
           );
         }
       } else {
@@ -60,7 +60,8 @@ class _SignupPageState extends State<SignupPage> {
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _errorMessage = 'This email is already registered. Please try logging in instead.';
+            _errorMessage =
+                'This email is already registered. Please try logging in instead.';
           });
         }
       }
@@ -77,8 +78,7 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-      ),
+      appBar: AppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -127,7 +127,8 @@ class _SignupPageState extends State<SignupPage> {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter your email';
                   }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                      .hasMatch(value)) {
                     return 'Please enter a valid email';
                   }
                   return null;
@@ -145,7 +146,9 @@ class _SignupPageState extends State<SignupPage> {
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -176,7 +179,9 @@ class _SignupPageState extends State<SignupPage> {
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                      _obscureConfirmPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -230,13 +235,14 @@ class _SignupPageState extends State<SignupPage> {
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
                     : const Text('SIGN UP'),
               ),
               const SizedBox(height: 16),
@@ -261,4 +267,3 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 }
-

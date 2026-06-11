@@ -37,4 +37,3 @@ Route<dynamic>? generateRoute(RouteSettings settings) {
   // If no match is found, return null to let the routes table handle it
   return null;
 }
-

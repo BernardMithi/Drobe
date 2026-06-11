@@ -43,7 +43,7 @@ class _ContactUsPageState extends State<ContactUsPage> {
           'CONTACT US',
           style: TextStyle(
             color: Colors.black,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w300,
             fontSize: 18,
           ),
         ),
@@ -127,7 +127,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email';
-                        } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                        } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            .hasMatch(value)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -141,13 +142,14 @@ class _ContactUsPageState extends State<ContactUsPage> {
                       'Issue Type',
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w200,
                         color: Colors.grey,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.grey[100],
                         borderRadius: BorderRadius.circular(8),
@@ -157,7 +159,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
                           value: _selectedIssue,
                           isExpanded: true,
                           icon: const Icon(Icons.arrow_drop_down),
-                          style: const TextStyle(color: Colors.black, fontSize: 16),
+                          style: const TextStyle(
+                              color: Colors.black, fontSize: 16),
                           onChanged: (String? newValue) {
                             if (newValue != null) {
                               setState(() {
@@ -165,7 +168,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
                               });
                             }
                           },
-                          items: _issueTypes.map<DropdownMenuItem<String>>((String value) {
+                          items: _issueTypes
+                              .map<DropdownMenuItem<String>>((String value) {
                             return DropdownMenuItem<String>(
                               value: value,
                               child: Text(value),
@@ -205,7 +209,9 @@ class _ContactUsPageState extends State<ContactUsPage> {
                       if (_formKey.currentState!.validate()) {
                         // Submit contact form
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Your message has been sent. We\'ll get back to you soon.')),
+                          const SnackBar(
+                              content: Text(
+                                  'Your message has been sent. We\'ll get back to you soon.')),
                         );
                         Navigator.of(context).pop();
                       }
@@ -213,9 +219,9 @@ class _ContactUsPageState extends State<ContactUsPage> {
                     label: const Text(
                       'SEND MESSAGE',
                       style: TextStyle(
-                        fontFamily: 'Avenir',
+                        fontFamily: 'BarlowCondensed',
                         fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w300,
                       ),
                     ),
                     backgroundColor: Colors.grey[300],
@@ -223,7 +229,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5),
                     ),
-                    extendedPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    extendedPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
                     isExtended: true,
                   ),
                 ),
@@ -253,7 +260,7 @@ class _ContactUsPageState extends State<ContactUsPage> {
           label,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w200,
             color: Colors.grey,
           ),
         ),
@@ -308,7 +315,7 @@ class _ContactUsPageState extends State<ContactUsPage> {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w200,
                   ),
                 ),
                 Text(
@@ -328,4 +335,3 @@ class _ContactUsPageState extends State<ContactUsPage> {
     );
   }
 }
-

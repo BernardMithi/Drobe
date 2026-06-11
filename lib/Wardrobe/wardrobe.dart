@@ -1,12 +1,12 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'wardrobeCategory.dart';
-import 'package:drobe/settings/profile.dart'; // Correct import for ProfilePage
+import 'package:drobe/settings/profile.dart';
 import 'package:drobe/settings/profileAvatar.dart';
 import 'package:drobe/auth/authService.dart';
-import 'package:drobe/models/fabricModel.dart';
-import 'package:drobe/Fabrics/fabricTipDetail.dart';
+import 'wardrobeTheme.dart';
 
-class WardrobePage extends StatefulWidget { // Changed to StatefulWidget
+class WardrobePage extends StatefulWidget {
   const WardrobePage({super.key});
 
   @override
@@ -14,53 +14,83 @@ class WardrobePage extends StatefulWidget { // Changed to StatefulWidget
 }
 
 class _WardrobePageState extends State<WardrobePage> {
-  // Key to force refresh of the avatar
-  Key _avatarKey = ValueKey('wardrobe_avatar_${DateTime.now().millisecondsSinceEpoch}');
+  Key _avatarKey =
+      ValueKey('wardrobe_avatar_${DateTime.now().millisecondsSinceEpoch}');
+
+  final List<String> _categories = const [
+    'LAYERS',
+    'SHIRTS',
+    'BOTTOMS',
+    'SHOES',
+    'ACCESSORIES',
+  ];
+
+  final Map<String, String> _categoryIcons = const {
+    'LAYERS': 'assets/icons/streamline/layer.png',
+    'SHIRTS': 'assets/icons/streamline/t-shirt.png',
+    'BOTTOMS': 'assets/icons/streamline/bottoms.png',
+    'SHOES': 'assets/icons/streamline/shoes.png',
+    'ACCESSORIES': 'assets/icons/streamline/accessories.png',
+  };
 
   void _refreshAvatar() {
     setState(() {
-      _avatarKey = ValueKey('wardrobe_avatar_${DateTime.now().millisecondsSinceEpoch}');
+      _avatarKey =
+          ValueKey('wardrobe_avatar_${DateTime.now().millisecondsSinceEpoch}');
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: WardrobeTheme.pageBackground,
       appBar: AppBar(
-        title: const Text(
-            'YOUR WARDROBE',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
-        ),
+        backgroundColor: WardrobeTheme.pageBackground,
+        foregroundColor: WardrobeTheme.ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
+        titleSpacing: 0,
+        title: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('EDIT / CURATE / WEAR', style: WardrobeTheme.eyebrow),
+            SizedBox(height: 2),
+            Text('YOUR WARDROBE', style: WardrobeTheme.appBarTitle),
+          ],
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          icon: const Icon(CupertinoIcons.back, size: 22),
+          onPressed: () => Navigator.pop(context),
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 8.0),
+            padding: const EdgeInsets.only(right: 12),
             child: GestureDetector(
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ProfilePage()),
-                ).then((_) {
-                  // Refresh when returning from profile page
-                  _refreshAvatar();
-                });
+                ).then((_) => _refreshAvatar());
               },
               child: FutureBuilder<Map<String, String>>(
                 future: AuthService().getCurrentUser(),
                 builder: (context, snapshot) {
-                  final userData = snapshot.data ?? {'id': '', 'name': '', 'email': ''};
-                  return ProfileAvatar(
-                    key: _avatarKey,
-                    size: 42,
-                    userId: userData['id'] ?? '',
-                    name: userData['name'] ?? '',
-                    email: userData['email'] ?? '',
+                  final userData =
+                      snapshot.data ?? {'id': '', 'name': '', 'email': ''};
+                  return Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: WardrobeTheme.line, width: 1),
+                    ),
+                    child: ProfileAvatar(
+                      key: _avatarKey,
+                      size: 40,
+                      userId: userData['id'] ?? '',
+                      name: userData['name'] ?? '',
+                      email: userData['email'] ?? '',
+                    ),
                   );
                 },
               ),
@@ -68,109 +98,153 @@ class _WardrobePageState extends State<WardrobePage> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildCapsuleWardrobeBanner(context),
-            const SizedBox(height: 5),
-            _buildCategoryButton(context, 'LAYERS'),
-            _buildCategoryButton(context, 'SHIRTS'),
-            _buildCategoryButton(context, 'BOTTOMS'),
-            _buildCategoryButton(context, 'SHOES'),
-            _buildCategoryButton(context, 'ACCESSORIES'),
-          ],
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 10, 22, 10),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 760;
+              final categorySpacing = compact ? 8.0 : 10.0;
+              final sectionSpacing = compact ? 14.0 : 18.0;
+
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCapsuleWardrobeBanner(compact: compact),
+                    SizedBox(height: sectionSpacing),
+                    Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 1,
+                          color: WardrobeTheme.accent,
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'CATEGORIES',
+                          style: WardrobeTheme.sectionLabel,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    ..._categories.map(
+                      (category) => Padding(
+                        padding: EdgeInsets.only(bottom: categorySpacing),
+                        child: _buildCategoryTile(context, category),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCapsuleWardrobeBanner(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => FabricTipDetailPage(tip: fabricTips.firstWhere((tip) => tip.id == '9')),
+  Widget _buildCapsuleWardrobeBanner({required bool compact}) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(18, 18, 18, compact ? 16 : 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        image: const DecorationImage(
+          image: NetworkImage(
+            'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1400&q=80',
           ),
-        );
-      },
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+        ),
+      ),
       child: Container(
-        height: 110,
-        width: double.infinity,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(2),
-          image: DecorationImage(
-            image: const NetworkImage(
-              'https://images.unsplash.com/photo-1560243563-062bfc001d68?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-            ),
-            fit: BoxFit.cover,
-            colorFilter: ColorFilter.mode(
-              Colors.white.withOpacity(0.85),
-              BlendMode.lighten,
-            ),
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF4A392D).withValues(alpha: 0.62),
+              const Color(0xFF7A604B).withValues(alpha: 0.38),
+              const Color(0xFF2C211B).withValues(alpha: 0.76),
+            ],
+            stops: const [0.0, 0.45, 1.0],
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Container(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(18, 18, 18, compact ? 16 : 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.1),
-                    ],
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.16),
+                  ),
+                ),
+                child: const Text(
+                  'EDITORIAL PICK',
+                  style: TextStyle(
+                    fontFamily: 'BarlowCondensed',
+                    fontSize: 10.5,
+                    letterSpacing: 1.7,
+                    color: Colors.white,
                   ),
                 ),
               ),
-            ),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'CAPSULE WARDROBE TIPS',
-                    style: TextStyle(
-                      fontFamily: 'Avenir',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Quality over quantity: Create a versatile collection',
-                    style: TextStyle(
-                      fontFamily: 'Avenir',
-                      fontSize: 14,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Icon(
-                    Icons.arrow_forward,
-                    size: 20,
-                    color: Colors.grey[800],
-                  ),
-                ],
+              SizedBox(height: compact ? 20 : 24),
+              Text(
+                compact
+                    ? 'Build a capsule wardrobe\nthat feels personal'
+                    : 'Build a capsule wardrobe\nthat still feels personal',
+                style: TextStyle(
+                  fontFamily: 'BarlowCondensed',
+                  fontSize: compact ? 27 : 30,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 0.2,
+                  height: 0.96,
+                  color: Colors.white,
+                ),
               ),
-            ),
-          ],
+              SizedBox(height: compact ? 8 : 10),
+              Text(
+                'Refine the pieces you actually wear and shape a wardrobe with more clarity, less noise, and better daily combinations.',
+                maxLines: compact ? 3 : 4,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 12.2 : 13.0,
+                  height: 1.42,
+                  color: Colors.white.withValues(alpha: 0.84),
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryButton(BuildContext context, String category) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: OutlinedButton(
-        onPressed: () {
-          // Navigate to WardrobeCategoryPage with category name
+  Widget _buildCategoryTile(BuildContext context, String category) {
+    final iconPath =
+        _categoryIcons[category] ?? 'assets/icons/streamline/layer.png';
+
+    return Material(
+      color: WardrobeTheme.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -178,19 +252,25 @@ class _WardrobePageState extends State<WardrobePage> {
             ),
           );
         },
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(100),
-          side: const BorderSide(color: Colors.grey),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(2)),
+        child: Container(
+          width: double.infinity,
+          height: 78,
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: WardrobeTheme.line),
           ),
-        ),
-        child: Text(
-          category,
-          style: const TextStyle(
-            fontFamily: 'Avenir',
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+          alignment: Alignment.center,
+          child: Text(
+            category,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: 'BarlowCondensed',
+              fontSize: 18,
+              fontWeight: FontWeight.w300,
+              letterSpacing: 0.25,
+              color: WardrobeTheme.ink,
+            ),
           ),
         ),
       ),

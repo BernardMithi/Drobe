@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
@@ -16,6 +17,9 @@ import 'package:drobe/services/hiveServiceManager.dart';
 import 'package:drobe/main.dart';
 import 'package:drobe/settings/profileAvatar.dart';
 import 'package:drobe/auth/authService.dart';
+import 'package:drobe/theme/drobe_icon.dart';
+import 'package:drobe/theme/drobe_bottom_action.dart';
+import 'package:drobe/utils/category_utils.dart';
 
 class OutfitsPage extends StatefulWidget {
   const OutfitsPage({Key? key}) : super(key: key);
@@ -142,13 +146,25 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
       if (_currentEditingOutfitId != currentOutfit.id) {
         _outfitNameController.text = currentOutfit.name;
         _currentEditingOutfitId = currentOutfit.id;
-        print('Updated text controller with outfit name: ${currentOutfit.name}, ID: ${currentOutfit.id}');
+        print(
+            'Updated text controller with outfit name: ${currentOutfit.name}, ID: ${currentOutfit.id}');
       }
     }
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('OUTFITS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF242424),
+        elevation: 0,
+        title: const Text(
+          'OUTFITS',
+          style: TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 20,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
         centerTitle: true,
         actions: [
           Padding(
@@ -166,9 +182,11 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
               child: FutureBuilder<Map<String, String>>(
                 future: AuthService().getCurrentUser(),
                 builder: (context, snapshot) {
-                  final userData = snapshot.data ?? {'id': '', 'name': '', 'email': ''};
+                  final userData =
+                      snapshot.data ?? {'id': '', 'name': '', 'email': ''};
                   return ProfileAvatar(
-                    key: ValueKey('outfits_avatar_${DateTime.now().millisecondsSinceEpoch}'),
+                    key: ValueKey(
+                        'outfits_avatar_${DateTime.now().millisecondsSinceEpoch}'),
                     size: 42,
                     userId: userData['id'] ?? '',
                     name: userData['name'] ?? '',
@@ -180,524 +198,130 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
           ),
         ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: const DrobeBottomFabLocation.center(),
       floatingActionButton: SizedBox(
         width: MediaQuery.of(context).size.width,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
-            mainAxisAlignment: hasOutfits ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+            mainAxisAlignment: hasOutfits
+                ? MainAxisAlignment.spaceBetween
+                : MainAxisAlignment.center,
             children: [
-              // Only show edit button if there are outfits
               if (hasOutfits)
-                FloatingActionButton(
-                  heroTag: 'editBtn',
-                  backgroundColor: Colors.grey[300],
-                  shape: const CircleBorder(),
-                  onPressed: () {
-                    if (_isEditing) {
-                      // Save the outfit name when exiting edit mode
-                      final normalizedDate = _normalizeDate(selectedDate);
-                      if (outfitsPerDay.containsKey(normalizedDate) &&
-                          outfitsPerDay[normalizedDate]!.isNotEmpty &&
-                          _currentOutfitIndex < outfitsPerDay[normalizedDate]!.length) {
-
-                        final currentOutfit = outfitsPerDay[normalizedDate]![_currentOutfitIndex];
-
-                        // Only update if the name has actually changed
-                        if (currentOutfit.name != _outfitNameController.text) {
-                          print('Saving outfit name from "${currentOutfit.name}" to "${_outfitNameController.text}" (ID: ${currentOutfit.id})');
-
-                          // Create a new outfit with the updated name
-                          final updatedOutfit = currentOutfit.copyWith(
-                            name: _outfitNameController.text,
-                            id: currentOutfit.id,
-                          );
-
-                          setState(() {
-                            outfitsPerDay[normalizedDate]![_currentOutfitIndex] = updatedOutfit;
-                          });
-
-                          // Save the updated outfit
-                          _updateOutfit(_currentOutfitIndex);
-                        }
-                      }
-                    }
-
-                    setState(() {
-                      _isEditing = !_isEditing;
-
-                      // Update the text controller when entering edit mode
-                      if (_isEditing && outfitCount > 0) {
-                        final currentOutfit = outfitsForSelectedDate[_currentOutfitIndex];
-                        _outfitNameController.text = currentOutfit.name;
-                        _currentEditingOutfitId = currentOutfit.id;
-                      }
-                    });
-                  },
-                  child: Icon(_isEditing ? Icons.check : Icons.edit, color: Colors.black),
-                ),
-              FloatingActionButton(
-                heroTag: 'addBtn',
-                backgroundColor: Colors.grey[300],
-                shape: const CircleBorder(),
-                onPressed: _isSaving ? null : () async {
-                  if (_isEditing && hasOutfits) {
-                    // Delete functionality when in edit mode
-                    final normalizedDate = _normalizeDate(selectedDate);
-                    final outfitsForSelectedDate = outfitsPerDay[normalizedDate] ?? [];
-
-                    if (outfitsForSelectedDate.isNotEmpty) {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Delete Outfit'),
-                          content: const Text('Are you sure you want to delete this outfit?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () async {
-                                final normalizedDate = _normalizeDate(selectedDate);
-                                final outfitToDelete = outfitsPerDay[normalizedDate]![_currentOutfitIndex];
-
-                                if (outfitToDelete.id != null) {
-                                  await OutfitStorageService.deleteOutfit(outfitToDelete.id!);
-                                }
-
-                                setState(() {
-                                  outfitsPerDay[normalizedDate]!.removeAt(_currentOutfitIndex);
-
-                                  // If removed last outfit for this day, remove the date entry
-                                  if (outfitsPerDay[normalizedDate]!.isEmpty) {
-                                    outfitsPerDay.remove(normalizedDate);
-                                    _isEditing = false; // Exit edit mode if no outfits left
-                                  }
-                                  // Adjust current index if needed
-                                  else if (_currentOutfitIndex > 0 &&
-                                      _currentOutfitIndex >= outfitsPerDay[normalizedDate]!.length) {
-                                    _currentOutfitIndex--;
-                                    _outfitController.jumpToPage(_currentOutfitIndex);
-                                  }
-                                });
-                                Navigator.pop(context);
-                              },
-                              child: const Text('Delete'),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                  } else {
-                    // Add functionality when not in edit mode
-                    if (_isSaving) return; // Prevent multiple taps
-
-                    setState(() {
-                      _isSaving = true;
-                    });
-
-                    final result = await Navigator.push<dynamic>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CreatePalettePage(
-                          selectedDate: selectedDate,
-                        ),
-                      ),
-                    );
-
-                    if (result != null) {
-                      try {
-                        // Check if the result is an Outfit object (from CreateOutfitPage)
-                        if (result is Outfit) {
-                          // Save the outfit directly
-                          final savedOutfit = await OutfitStorageService.saveOutfit(result);
-                          print('Saved outfit with ID: ${savedOutfit.id}, Name: ${savedOutfit.name}');
-
-                          // Set the selected date to the outfit's date
-                          setState(() {
-                            selectedDate = _normalizeDate(savedOutfit.date);
-                            _isSaving = false;
-                          });
-
-                          // Reload outfits to show the newly added outfit
-                          await _loadOutfits();
-                          return;
-                        }
-
-                        // Otherwise, handle as a palette result (Map<String, dynamic>)
-                        final newPalette = result as Map<String, dynamic>;
-
-                        // Get the outfit date - either from the result or use the current selected date
-                        DateTime outfitDate;
-                        if (newPalette.containsKey('date') && newPalette['date'] != null) {
-                          // Try to parse the date from the result
-                          try {
-                            outfitDate = DateTime.parse(newPalette['date'] as String);
-                          } catch (e) {
-                            outfitDate = _normalizeDate(selectedDate);
-                          }
-                        } else {
-                          outfitDate = _normalizeDate(selectedDate);
-                        }
-
-                        // Convert Color objects to hex strings for storing
-                        List<String> colorPaletteStrings = [];
-                        List<Color> colorPalette = [];
-
-                        if (newPalette['colorPalette'] != null) {
-                          colorPalette = List<Color>.from(newPalette['colorPalette'] as List<dynamic>);
-                          colorPaletteStrings = colorPalette
-                              .map((color) => '#${color.value.toRadixString(16).substring(2)}')
-                              .toList();
-                        }
-                        if (colorPalette.isEmpty) {
-                          colorPalette = [Colors.grey]; // Default gray
-                          colorPaletteStrings = ['#9E9E9E'];
-                        }
-
-                        // If the result contains an outfit object, use it directly
-                        Outfit newOutfit;
-                        if (newPalette.containsKey('outfit') && newPalette['outfit'] != null) {
-                          final outfitObj = newPalette['outfit'];
-                          if (outfitObj is Outfit) {
-                            newOutfit = outfitObj.copyWith(
-                              id: const Uuid().v4(), // Generate ID immediately
-                            );
-                          } else {
-                            // Create the new outfit from the palette data
-                            newOutfit = Outfit(
-                              id: const Uuid().v4(), // Generate ID immediately
-                              name: newPalette['name'] as String,
-                              date: outfitDate,
-                              clothes: Map<String, String?>.from(newPalette['clothes']),
-                              accessories: (newPalette['accessories'] as List<dynamic>?)
-                                  ?.where((item) => item != null)
-                                  ?.cast<String>()
-                                  ?.toList() ?? [], // Filter out nulls
-                              colorPalette: colorPalette,
-                              colorPaletteStrings: colorPaletteStrings,
-                            );
-                          }
-                        } else {
-                          // Create the new outfit from the palette data
-                          newOutfit = Outfit(
-                            id: const Uuid().v4(), // Generate ID immediately
-                            name: newPalette['name'] as String,
-                            date: outfitDate,
-                            clothes: Map<String, String?>.from(newPalette['clothes']),
-                            accessories: (newPalette['accessories'] as List<dynamic>?)
-                                ?.where((item) => item != null)
-                                ?.cast<String>()
-                                ?.toList() ?? [], // Filter out nulls
-                            colorPalette: colorPalette,
-                            colorPaletteStrings: colorPaletteStrings,
-                          );
-                        }
-
-                        // Save the outfit
-                        await OutfitStorageService.saveOutfit(newOutfit);
-                        print('Saved new outfit with ID: ${newOutfit.id}, Name: ${newOutfit.name}');
-
-                        // Update the selected date to match the outfit's date
-                        setState(() {
-                          selectedDate = _normalizeDate(newOutfit.date);
-                          _isSaving = false;
-                        });
-
-                        // Reload outfits to show the newly added outfit
-                        await _loadOutfits();
-                      } catch (e) {
-                        print('Error saving outfit: $e');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error saving outfit: $e')),
-                        );
-                        setState(() {
-                          _isSaving = false;
-                        });
-                      }
-                    } else {
-                      setState(() {
-                        _isSaving = false;
-                      });
-                    }
-                  }
-                },
-                child: _isSaving
-                    ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.black,
-                    strokeWidth: 2,
-                  ),
-                )
-                    : Icon(_isEditing ? Icons.delete : Icons.add, color: Colors.black),
-              ),
-            ],
-          ),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 132),
-        child: Column(
-          children: [
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
+                Expanded(
+                  child: _buildBottomActionButton(
+                    icon: _isEditing ? Icons.check : Icons.edit,
+                    label: _isEditing ? 'SAVE' : 'EDIT',
+                    isPrimary: _isEditing,
                     onPressed: () {
-                      setState(() {
-                        selectedDate = _normalizeDate(selectedDate.subtract(const Duration(days: 1)));
-                        _currentOutfitIndex = 0;
-                        // Exit edit mode when changing date
-                        if (_isEditing) {
-                          _isEditing = false;
-                        }
-                      });
-                    },
-                  ),
-                  GestureDetector(
-                    onTap: () async {
-                      final pickedDate = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      );
-                      if (pickedDate != null) {
-                        setState(() {
-                          selectedDate = _normalizeDate(pickedDate);
-                          _currentOutfitIndex = 0;
-                          // Exit edit mode when changing date
-                          if (_isEditing) {
-                            _isEditing = false;
-                          }
-                        });
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Text(
-                        _getFormattedDate(selectedDate),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: () {
-                      setState(() {
-                        selectedDate = _normalizeDate(selectedDate.add(const Duration(days: 1)));
-                        _currentOutfitIndex = 0;
-                        // Exit edit mode when changing date
-                        if (_isEditing) {
-                          _isEditing = false;
-                        }
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : hasOutfits
-                      ? Column(
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _isEditing
-                              ? SizedBox(
-                              width: 300,
-                              child: TextField(
-                                controller: _outfitNameController,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                textAlignVertical: TextAlignVertical.center,
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 6),
-                                  border: OutlineInputBorder(),
-                                ),
-                                // Remove onChanged handler to prevent continuous updates
-                                textInputAction: TextInputAction.done,
-                                onEditingComplete: () {
-                                  // Update the outfit with the new name
-                                  final normalizedDate = _normalizeDate(selectedDate);
-                                  final currentOutfit = outfitsPerDay[normalizedDate]![_currentOutfitIndex];
-                                  final outfitId = _currentEditingOutfitId;
+                      if (_isEditing) {
+                        final normalizedDate = _normalizeDate(selectedDate);
+                        if (outfitsPerDay.containsKey(normalizedDate) &&
+                            outfitsPerDay[normalizedDate]!.isNotEmpty &&
+                            _currentOutfitIndex <
+                                outfitsPerDay[normalizedDate]!.length) {
+                          final currentOutfit = outfitsPerDay[normalizedDate]![
+                              _currentOutfitIndex];
 
-                                  // Only update if the name has actually changed
-                                  if (currentOutfit.name != _outfitNameController.text) {
-                                    print('Updating outfit name from "${currentOutfit.name}" to "${_outfitNameController.text}" (ID: $outfitId)');
+                          if (currentOutfit.name !=
+                              _outfitNameController.text) {
+                            final updatedOutfit = currentOutfit.copyWith(
+                              name: _outfitNameController.text,
+                              id: currentOutfit.id,
+                            );
 
-                                    // Create a new outfit with the updated name
-                                    final updatedOutfit = currentOutfit.copyWith(
-                                      name: _outfitNameController.text,
-                                      id: outfitId,
-                                    );
-
-                                    setState(() {
-                                      outfitsPerDay[normalizedDate]![_currentOutfitIndex] = updatedOutfit;
-                                    });
-
-                                    // Save the updated outfit
-                                    _updateOutfit(_currentOutfitIndex);
-                                  }
-
-                                  // Remove focus from the text field
-                                  FocusScope.of(context).unfocus();
-                                },
-                                onSubmitted: (_) {
-                                  // This is called when the user presses the "done" button on the keyboard
-                                  final normalizedDate = _normalizeDate(selectedDate);
-                                  final currentOutfit = outfitsPerDay[normalizedDate]![_currentOutfitIndex];
-                                  final outfitId = _currentEditingOutfitId;
-
-                                  // Only update if the name has actually changed
-                                  if (currentOutfit.name != _outfitNameController.text) {
-                                    print('Updating outfit name from "${currentOutfit.name}" to "${_outfitNameController.text}" (ID: $outfitId)');
-
-                                    // Create a new outfit with the updated name
-                                    final updatedOutfit = currentOutfit.copyWith(
-                                      name: _outfitNameController.text,
-                                      id: outfitId,
-                                    );
-
-                                    setState(() {
-                                      outfitsPerDay[normalizedDate]![_currentOutfitIndex] = updatedOutfit;
-                                    });
-
-                                    // Save the updated outfit
-                                    _updateOutfit(_currentOutfitIndex);
-                                  }
-                                },
-                              )
-                          )
-                              : Text(
-                            outfitsForSelectedDate[_currentOutfitIndex].name,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            '${_currentOutfitIndex + 1}/${outfitsForSelectedDate.length}',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 15),
-                      Expanded(
-                        flex: 3,
-                        child: PageView.builder(
-                          controller: _outfitController,
-                          onPageChanged: (index) {
                             setState(() {
-                              _currentOutfitIndex = index;
-
-                              // Update the text controller when changing pages
-                              if (outfitsForSelectedDate.isNotEmpty) {
-                                final currentOutfit = outfitsForSelectedDate[index];
-                                _outfitNameController.text = currentOutfit.name;
-                                _currentEditingOutfitId = currentOutfit.id;
-                              }
+                              outfitsPerDay[normalizedDate]![
+                                  _currentOutfitIndex] = updatedOutfit;
                             });
-                          },
-                          itemCount: outfitCount,
-                          itemBuilder: (context, outfitIndex) {
-                            final Outfit outfit = outfitsForSelectedDate[outfitIndex];
-                            return Column(
-                              children: [
-                                Expanded(
-                                  child: GridView.count(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 8,
-                                    mainAxisSpacing: 8,
-                                    childAspectRatio: 1,
-                                    children: [
-                                      // Always show these four standard clothing categories, regardless of whether they exist in the outfit
-                                      _buildClothingItem('LAYER', outfit.clothes['LAYER'], outfitIndex),
-                                      _buildClothingItem('SHIRT', outfit.clothes['SHIRT'], outfitIndex),
-                                      _buildClothingItem('BOTTOMS', outfit.clothes['BOTTOMS'], outfitIndex),
-                                      _buildClothingItem('SHOES', outfit.clothes['SHOES'], outfitIndex),
-                                    ],
-                                  ),
-                                ),
 
-                                if (outfit.accessories.isNotEmpty || _isEditing)
-                                  SizedBox(
-                                    height: 140,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Padding(
-                                              padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
-                                              child: Text(
-                                                "Accessories",
-                                                style: TextStyle(fontWeight: FontWeight.bold),
-                                              ),
-                                            ),
-                                            if (_isEditing)
-                                              IconButton(
-                                                icon: const Icon(Icons.add_circle, color: Colors.grey),
-                                                padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(),
-                                                onPressed: () => _addNewAccessory(outfitIndex),
-                                              ),
-                                          ],
-                                        ),
-                                        Expanded(
-                                          child: outfit.accessories.isEmpty && !_isEditing
-                                              ? const Center(
-                                            child: Text(
-                                              'No accessories',
-                                              style: TextStyle(color: Colors.grey),
-                                            ),
-                                          )
-                                              : ListView.builder(
-                                            scrollDirection: Axis.horizontal,
-                                            itemCount: outfit.accessories.length,
-                                            itemBuilder: (context, index) {
-                                              final accessoryUrl = outfit.accessories[index];
-                                              return _buildAccessoryItem(accessoryUrl, outfitIndex, index);
-                                            },
-                                          ),
-                                        ),
-                                      ],
+                            _updateOutfit(_currentOutfitIndex);
+                          }
+                        }
+                      }
+
+                      setState(() {
+                        _isEditing = !_isEditing;
+
+                        if (_isEditing && outfitCount > 0) {
+                          final currentOutfit =
+                              outfitsForSelectedDate[_currentOutfitIndex];
+                          _outfitNameController.text = currentOutfit.name;
+                          _currentEditingOutfitId = currentOutfit.id;
+                        }
+                      });
+                    },
+                  ),
+                ),
+              if (hasOutfits) const SizedBox(width: 12),
+              Expanded(
+                child: _buildBottomActionButton(
+                  icon: _isEditing ? Icons.delete : Icons.add,
+                  label: _isEditing ? 'DELETE' : 'ADD',
+                  isPrimary: !_isEditing,
+                  onPressed: _isSaving
+                      ? null
+                      : () async {
+                          if (_isEditing && hasOutfits) {
+                            final normalizedDate = _normalizeDate(selectedDate);
+                            final outfitsForSelectedDate =
+                                outfitsPerDay[normalizedDate] ?? [];
+
+                            if (outfitsForSelectedDate.isNotEmpty) {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Delete Outfit'),
+                                  content: const Text(
+                                      'Are you sure you want to delete this outfit?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Cancel'),
                                     ),
-                                  ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  )
-                      : Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'No outfits for this day',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _isSaving ? null : () async {
+                                    TextButton(
+                                      onPressed: () async {
+                                        final normalizedDate =
+                                            _normalizeDate(selectedDate);
+                                        final outfitToDelete =
+                                            outfitsPerDay[normalizedDate]![
+                                                _currentOutfitIndex];
+
+                                        if (outfitToDelete.id != null) {
+                                          await OutfitStorageService
+                                              .deleteOutfit(outfitToDelete.id!);
+                                        }
+
+                                        setState(() {
+                                          outfitsPerDay[normalizedDate]!
+                                              .removeAt(_currentOutfitIndex);
+
+                                          if (outfitsPerDay[normalizedDate]!
+                                              .isEmpty) {
+                                            outfitsPerDay
+                                                .remove(normalizedDate);
+                                            _isEditing = false;
+                                          } else if (_currentOutfitIndex > 0 &&
+                                              _currentOutfitIndex >=
+                                                  outfitsPerDay[normalizedDate]!
+                                                      .length) {
+                                            _currentOutfitIndex--;
+                                            _outfitController.jumpToPage(
+                                                _currentOutfitIndex);
+                                          }
+                                        });
+                                        Navigator.pop(context);
+                                      },
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                          } else {
+                            if (_isSaving) return;
+
                             setState(() {
                               _isSaving = true;
                             });
@@ -713,23 +337,29 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
                             if (result != null) {
                               try {
-                                // Process the result (same logic as in the floating action button)
                                 if (result is Outfit) {
-                                  final savedOutfit = await OutfitStorageService.saveOutfit(result);
+                                  final savedOutfit =
+                                      await OutfitStorageService.saveOutfit(
+                                          result);
+
                                   setState(() {
-                                    selectedDate = _normalizeDate(savedOutfit.date);
+                                    selectedDate =
+                                        _normalizeDate(savedOutfit.date);
                                     _isSaving = false;
                                   });
+
                                   await _loadOutfits();
                                   return;
                                 }
 
-                                // Handle palette result
-                                final newPalette = result as Map<String, dynamic>;
+                                final newPalette =
+                                    result as Map<String, dynamic>;
                                 DateTime outfitDate;
-                                if (newPalette.containsKey('date') && newPalette['date'] != null) {
+                                if (newPalette.containsKey('date') &&
+                                    newPalette['date'] != null) {
                                   try {
-                                    outfitDate = DateTime.parse(newPalette['date'] as String);
+                                    outfitDate = DateTime.parse(
+                                        newPalette['date'] as String);
                                   } catch (e) {
                                     outfitDate = _normalizeDate(selectedDate);
                                   }
@@ -737,14 +367,16 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
                                   outfitDate = _normalizeDate(selectedDate);
                                 }
 
-                                // Convert Color objects to hex strings
                                 List<String> colorPaletteStrings = [];
                                 List<Color> colorPalette = [];
 
                                 if (newPalette['colorPalette'] != null) {
-                                  colorPalette = List<Color>.from(newPalette['colorPalette'] as List<dynamic>);
+                                  colorPalette = List<Color>.from(
+                                      newPalette['colorPalette']
+                                          as List<dynamic>);
                                   colorPaletteStrings = colorPalette
-                                      .map((color) => '#${color.value.toRadixString(16).substring(2)}')
+                                      .map((color) =>
+                                          '#${color.value.toRadixString(16).substring(2)}')
                                       .toList();
                                 }
                                 if (colorPalette.isEmpty) {
@@ -752,24 +384,26 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
                                   colorPaletteStrings = ['#9E9E9E'];
                                 }
 
-                                // Create outfit
                                 Outfit newOutfit;
-                                if (newPalette.containsKey('outfit') && newPalette['outfit'] != null) {
+                                if (newPalette.containsKey('outfit') &&
+                                    newPalette['outfit'] != null) {
                                   final outfitObj = newPalette['outfit'];
                                   if (outfitObj is Outfit) {
                                     newOutfit = outfitObj.copyWith(
-                                      id: const Uuid().v4(),
-                                    );
+                                        id: const Uuid().v4());
                                   } else {
                                     newOutfit = Outfit(
                                       id: const Uuid().v4(),
                                       name: newPalette['name'] as String,
                                       date: outfitDate,
-                                      clothes: Map<String, String?>.from(newPalette['clothes']),
-                                      accessories: (newPalette['accessories'] as List<dynamic>?)
-                                          ?.where((item) => item != null)
-                                          ?.cast<String>()
-                                          ?.toList() ?? [],
+                                      clothes: Map<String, String?>.from(
+                                          newPalette['clothes']),
+                                      accessories: (newPalette['accessories']
+                                                  as List<dynamic>?)
+                                              ?.where((item) => item != null)
+                                              .cast<String>()
+                                              .toList() ??
+                                          [],
                                       colorPalette: colorPalette,
                                       colorPaletteStrings: colorPaletteStrings,
                                     );
@@ -779,70 +413,645 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
                                     id: const Uuid().v4(),
                                     name: newPalette['name'] as String,
                                     date: outfitDate,
-                                    clothes: Map<String, String?>.from(newPalette['clothes']),
-                                    accessories: (newPalette['accessories'] as List<dynamic>?)
-                                        ?.where((item) => item != null)
-                                        ?.cast<String>()
-                                        ?.toList() ?? [],
+                                    clothes: Map<String, String?>.from(
+                                        newPalette['clothes']),
+                                    accessories: (newPalette['accessories']
+                                                as List<dynamic>?)
+                                            ?.where((item) => item != null)
+                                            .cast<String>()
+                                            .toList() ??
+                                        [],
                                     colorPalette: colorPalette,
                                     colorPaletteStrings: colorPaletteStrings,
                                   );
                                 }
 
-                                await OutfitStorageService.saveOutfit(newOutfit);
+                                final savedOutfit =
+                                    await OutfitStorageService.saveOutfit(
+                                        newOutfit);
                                 setState(() {
-                                  selectedDate = _normalizeDate(newOutfit.date);
+                                  selectedDate =
+                                      _normalizeDate(savedOutfit.date);
                                   _isSaving = false;
                                 });
                                 await _loadOutfits();
+                                return;
                               } catch (e) {
-                                print('Error saving outfit: $e');
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Error saving outfit: $e')),
+                                  SnackBar(
+                                    content: Text('Error saving outfit: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
                                 );
-                                setState(() {
-                                  _isSaving = false;
-                                });
                               }
-                            } else {
-                              setState(() {
-                                _isSaving = false;
-                              });
                             }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[300],
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: _isSaving
-                              ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.black,
-                              strokeWidth: 2,
-                            ),
-                          )
-                              : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.add),
-                              SizedBox(width: 8),
-                              Text(
-                                'Create Outfit',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                            ],
+
+                            setState(() {
+                              _isSaving = false;
+                            });
+                          }
+                        },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          DrobeBottomAction.scaffoldContentInset(context),
+        ),
+        child: Column(
+          children: [
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFE4DDD5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () {
+                        setState(() {
+                          selectedDate = _normalizeDate(
+                              selectedDate.subtract(const Duration(days: 1)));
+                          _currentOutfitIndex = 0;
+                          // Exit edit mode when changing date
+                          if (_isEditing) {
+                            _isEditing = false;
+                          }
+                        });
+                      },
+                    ),
+                    GestureDetector(
+                      onTap: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2030),
+                        );
+                        if (pickedDate != null) {
+                          setState(() {
+                            selectedDate = _normalizeDate(pickedDate);
+                            _currentOutfitIndex = 0;
+                            // Exit edit mode when changing date
+                            if (_isEditing) {
+                              _isEditing = false;
+                            }
+                          });
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Text(
+                          _getFormattedDate(selectedDate),
+                          style: const TextStyle(
+                            fontFamily: 'BarlowCondensed',
+                            fontSize: 19,
+                            fontWeight: FontWeight.w300,
+                            color: Color(0xFF242424),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  )
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () {
+                        setState(() {
+                          selectedDate = _normalizeDate(
+                              selectedDate.add(const Duration(days: 1)));
+                          _currentOutfitIndex = 0;
+                          // Exit edit mode when changing date
+                          if (_isEditing) {
+                            _isEditing = false;
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.74),
+                    border: Border.all(color: const Color(0xFFE4DDD5)),
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : hasOutfits
+                          ? Column(
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    _isEditing
+                                        ? SizedBox(
+                                            width: 300,
+                                            child: TextField(
+                                              controller: _outfitNameController,
+                                              style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w300),
+                                              textAlignVertical:
+                                                  TextAlignVertical.center,
+                                              decoration: const InputDecoration(
+                                                isDense: true,
+                                                contentPadding:
+                                                    EdgeInsets.symmetric(
+                                                        vertical: 0,
+                                                        horizontal: 6),
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              // Remove onChanged handler to prevent continuous updates
+                                              textInputAction:
+                                                  TextInputAction.done,
+                                              onEditingComplete: () {
+                                                // Update the outfit with the new name
+                                                final normalizedDate =
+                                                    _normalizeDate(
+                                                        selectedDate);
+                                                final currentOutfit =
+                                                    outfitsPerDay[
+                                                            normalizedDate]![
+                                                        _currentOutfitIndex];
+                                                final outfitId =
+                                                    _currentEditingOutfitId;
+
+                                                // Only update if the name has actually changed
+                                                if (currentOutfit.name !=
+                                                    _outfitNameController
+                                                        .text) {
+                                                  print(
+                                                      'Updating outfit name from "${currentOutfit.name}" to "${_outfitNameController.text}" (ID: $outfitId)');
+
+                                                  // Create a new outfit with the updated name
+                                                  final updatedOutfit =
+                                                      currentOutfit.copyWith(
+                                                    name: _outfitNameController
+                                                        .text,
+                                                    id: outfitId,
+                                                  );
+
+                                                  setState(() {
+                                                    outfitsPerDay[
+                                                                normalizedDate]![
+                                                            _currentOutfitIndex] =
+                                                        updatedOutfit;
+                                                  });
+
+                                                  // Save the updated outfit
+                                                  _updateOutfit(
+                                                      _currentOutfitIndex);
+                                                }
+
+                                                // Remove focus from the text field
+                                                FocusScope.of(context)
+                                                    .unfocus();
+                                              },
+                                              onSubmitted: (_) {
+                                                // This is called when the user presses the "done" button on the keyboard
+                                                final normalizedDate =
+                                                    _normalizeDate(
+                                                        selectedDate);
+                                                final currentOutfit =
+                                                    outfitsPerDay[
+                                                            normalizedDate]![
+                                                        _currentOutfitIndex];
+                                                final outfitId =
+                                                    _currentEditingOutfitId;
+
+                                                // Only update if the name has actually changed
+                                                if (currentOutfit.name !=
+                                                    _outfitNameController
+                                                        .text) {
+                                                  print(
+                                                      'Updating outfit name from "${currentOutfit.name}" to "${_outfitNameController.text}" (ID: $outfitId)');
+
+                                                  // Create a new outfit with the updated name
+                                                  final updatedOutfit =
+                                                      currentOutfit.copyWith(
+                                                    name: _outfitNameController
+                                                        .text,
+                                                    id: outfitId,
+                                                  );
+
+                                                  setState(() {
+                                                    outfitsPerDay[
+                                                                normalizedDate]![
+                                                            _currentOutfitIndex] =
+                                                        updatedOutfit;
+                                                  });
+
+                                                  // Save the updated outfit
+                                                  _updateOutfit(
+                                                      _currentOutfitIndex);
+                                                }
+                                              },
+                                            ))
+                                        : Text(
+                                            outfitsForSelectedDate[
+                                                    _currentOutfitIndex]
+                                                .name,
+                                            style: const TextStyle(
+                                              fontFamily: 'BarlowCondensed',
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.w300,
+                                              color: Color(0xFF242424),
+                                            ),
+                                          ),
+                                    Text(
+                                      '${_currentOutfitIndex + 1}/${outfitsForSelectedDate.length}',
+                                      style: const TextStyle(
+                                        fontFamily: 'BarlowCondensed',
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w300,
+                                        color: Color(0xFF5F5A54),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Expanded(
+                                  flex: 3,
+                                  child: PageView.builder(
+                                    controller: _outfitController,
+                                    onPageChanged: (index) {
+                                      setState(() {
+                                        _currentOutfitIndex = index;
+
+                                        // Update the text controller when changing pages
+                                        if (outfitsForSelectedDate.isNotEmpty) {
+                                          final currentOutfit =
+                                              outfitsForSelectedDate[index];
+                                          _outfitNameController.text =
+                                              currentOutfit.name;
+                                          _currentEditingOutfitId =
+                                              currentOutfit.id;
+                                        }
+                                      });
+                                    },
+                                    itemCount: outfitCount,
+                                    itemBuilder: (context, outfitIndex) {
+                                      final Outfit outfit =
+                                          outfitsForSelectedDate[outfitIndex];
+                                      return Column(
+                                        children: [
+                                          Expanded(
+                                            child: GridView.count(
+                                              crossAxisCount: 2,
+                                              crossAxisSpacing: 14,
+                                              mainAxisSpacing: 10,
+                                              childAspectRatio: 0.92,
+                                              physics: const NeverScrollableScrollPhysics(),
+                                              children: [
+                                                // Always show these four standard clothing categories, regardless of whether they exist in the outfit
+                                                _buildClothingItem(
+                                                    'LAYER',
+                                                    getOutfitClothingBySlot(
+                                                        outfit.clothes,
+                                                        'LAYER'),
+                                                    outfitIndex),
+                                                _buildClothingItem(
+                                                    'SHIRT',
+                                                    getOutfitClothingBySlot(
+                                                        outfit.clothes,
+                                                        'SHIRT'),
+                                                    outfitIndex),
+                                                _buildClothingItem(
+                                                    'BOTTOMS',
+                                                    getOutfitClothingBySlot(
+                                                        outfit.clothes,
+                                                        'BOTTOMS'),
+                                                    outfitIndex),
+                                                _buildClothingItem(
+                                                    'SHOES',
+                                                    getOutfitClothingBySlot(
+                                                        outfit.clothes,
+                                                        'SHOES'),
+                                                    outfitIndex),
+                                              ],
+                                            ),
+                                          ),
+                                          if (outfit.accessories.isNotEmpty ||
+                                              _isEditing)
+                                            SizedBox(
+                                              height: 120,
+                                              child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    const SizedBox(height: 4),
+                                                    Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .spaceBetween,
+                                                      children: [
+                                                        const Text(
+                                                          "ACCESSORIES",
+                                                          style: TextStyle(
+                                                              fontFamily:
+                                                                  'BarlowCondensed',
+                                                              fontSize: 13,
+                                                              letterSpacing: 0.8,
+                                                              color: Color(
+                                                                  0xFF8A8278),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w400),
+                                                        ),
+                                                        if (_isEditing)
+                                                          GestureDetector(
+                                                            onTap: () =>
+                                                                _addNewAccessory(
+                                                                    outfitIndex),
+                                                            child: const Icon(
+                                                              Icons.add_circle,
+                                                              color: Color(0xFF8A8278),
+                                                              size: 20,
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Expanded(
+                                                      child: outfit.accessories
+                                                                  .isEmpty &&
+                                                              !_isEditing
+                                                          ? const Center(
+                                                              child: Text(
+                                                                'No accessories',
+                                                                style: TextStyle(
+                                                                    color: Colors
+                                                                        .grey),
+                                                              ),
+                                                            )
+                                                          : Center(
+                                                              child: SingleChildScrollView(
+                                                                scrollDirection: Axis.horizontal,
+                                                                child: Row(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: List.generate(
+                                                                    outfit.accessories.length,
+                                                                    (i) => _buildAccessoryItem(outfit.accessories[i], outfitIndex, i),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                    ),
+                                                  ],
+                                                ),
+                                            ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'No outfits for this day',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontFamily: 'BarlowCondensed',
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w300,
+                                      color: Color(0xFF5F5A54),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  ElevatedButton(
+                                    onPressed: _isSaving
+                                        ? null
+                                        : () async {
+                                            setState(() {
+                                              _isSaving = true;
+                                            });
+
+                                            final result =
+                                                await Navigator.push<dynamic>(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    CreatePalettePage(
+                                                  selectedDate: selectedDate,
+                                                ),
+                                              ),
+                                            );
+
+                                            if (result != null) {
+                                              try {
+                                                // Process the result (same logic as in the floating action button)
+                                                if (result is Outfit) {
+                                                  final savedOutfit =
+                                                      await OutfitStorageService
+                                                          .saveOutfit(result);
+                                                  setState(() {
+                                                    selectedDate =
+                                                        _normalizeDate(
+                                                            savedOutfit.date);
+                                                    _isSaving = false;
+                                                  });
+                                                  await _loadOutfits();
+                                                  return;
+                                                }
+
+                                                // Handle palette result
+                                                final newPalette = result
+                                                    as Map<String, dynamic>;
+                                                DateTime outfitDate;
+                                                if (newPalette
+                                                        .containsKey('date') &&
+                                                    newPalette['date'] !=
+                                                        null) {
+                                                  try {
+                                                    outfitDate = DateTime.parse(
+                                                        newPalette['date']
+                                                            as String);
+                                                  } catch (e) {
+                                                    outfitDate = _normalizeDate(
+                                                        selectedDate);
+                                                  }
+                                                } else {
+                                                  outfitDate = _normalizeDate(
+                                                      selectedDate);
+                                                }
+
+                                                // Convert Color objects to hex strings
+                                                List<String>
+                                                    colorPaletteStrings = [];
+                                                List<Color> colorPalette = [];
+
+                                                if (newPalette[
+                                                        'colorPalette'] !=
+                                                    null) {
+                                                  colorPalette = List<
+                                                          Color>.from(
+                                                      newPalette['colorPalette']
+                                                          as List<dynamic>);
+                                                  colorPaletteStrings = colorPalette
+                                                      .map((color) =>
+                                                          '#${color.value.toRadixString(16).substring(2)}')
+                                                      .toList();
+                                                }
+                                                if (colorPalette.isEmpty) {
+                                                  colorPalette = [Colors.grey];
+                                                  colorPaletteStrings = [
+                                                    '#9E9E9E'
+                                                  ];
+                                                }
+
+                                                // Create outfit
+                                                Outfit newOutfit;
+                                                if (newPalette.containsKey(
+                                                        'outfit') &&
+                                                    newPalette['outfit'] !=
+                                                        null) {
+                                                  final outfitObj =
+                                                      newPalette['outfit'];
+                                                  if (outfitObj is Outfit) {
+                                                    newOutfit =
+                                                        outfitObj.copyWith(
+                                                      id: const Uuid().v4(),
+                                                    );
+                                                  } else {
+                                                    newOutfit = Outfit(
+                                                      id: const Uuid().v4(),
+                                                      name: newPalette['name']
+                                                          as String,
+                                                      date: outfitDate,
+                                                      clothes: Map<String,
+                                                              String?>.from(
+                                                          newPalette[
+                                                              'clothes']),
+                                                      accessories: (newPalette[
+                                                                      'accessories']
+                                                                  as List<
+                                                                      dynamic>?)
+                                                              ?.where((item) =>
+                                                                  item != null)
+                                                              ?.cast<String>()
+                                                              ?.toList() ??
+                                                          [],
+                                                      colorPalette:
+                                                          colorPalette,
+                                                      colorPaletteStrings:
+                                                          colorPaletteStrings,
+                                                    );
+                                                  }
+                                                } else {
+                                                  newOutfit = Outfit(
+                                                    id: const Uuid().v4(),
+                                                    name: newPalette['name']
+                                                        as String,
+                                                    date: outfitDate,
+                                                    clothes: Map<String,
+                                                            String?>.from(
+                                                        newPalette['clothes']),
+                                                    accessories: (newPalette[
+                                                                    'accessories']
+                                                                as List<
+                                                                    dynamic>?)
+                                                            ?.where((item) =>
+                                                                item != null)
+                                                            ?.cast<String>()
+                                                            ?.toList() ??
+                                                        [],
+                                                    colorPalette: colorPalette,
+                                                    colorPaletteStrings:
+                                                        colorPaletteStrings,
+                                                  );
+                                                }
+
+                                                await OutfitStorageService
+                                                    .saveOutfit(newOutfit);
+                                                setState(() {
+                                                  selectedDate = _normalizeDate(
+                                                      newOutfit.date);
+                                                  _isSaving = false;
+                                                });
+                                                await _loadOutfits();
+                                              } catch (e) {
+                                                print(
+                                                    'Error saving outfit: $e');
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content: Text(
+                                                          'Error saving outfit: $e')),
+                                                );
+                                                setState(() {
+                                                  _isSaving = false;
+                                                });
+                                              }
+                                            } else {
+                                              setState(() {
+                                                _isSaving = false;
+                                              });
+                                            }
+                                          },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.grey[300],
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 24, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: _isSaving
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.black,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: const [
+                                              Icon(Icons.add),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Create Outfit',
+                                                style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight:
+                                                        FontWeight.w300),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ],
+                              ),
+                            )),
             ),
           ],
         ),
@@ -852,20 +1061,23 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
   // Modify the _buildClothingItem function to allow adding items to empty slots when in edit mode
 
-  Widget _buildClothingItem(String category, String? imageUrl, int outfitIndex) {
+  Widget _buildClothingItem(
+      String category, String? imageUrl, int outfitIndex) {
     return GestureDetector(
       onTap: () => _isEditing ? _editItem(category, outfitIndex) : null,
       child: Stack(
         fit: StackFit.expand,
         children: [
           FutureBuilder<String?>(
-            future: imageUrl != null ? _resolveFilePath(imageUrl) : Future.value(null),
+            future: imageUrl != null
+                ? _resolveFilePath(imageUrl)
+                : Future.value(null),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
+                    color: const Color(0xFFF0ECE7),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Center(child: CircularProgressIndicator()),
                 );
@@ -873,36 +1085,61 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
               final resolvedPath = snapshot.data;
 
-              return Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.grey.shade300),
-                  image: resolvedPath != null
-                      ? DecorationImage(
-                      image: resolvedPath.startsWith('http')
-                          ? NetworkImage(resolvedPath)
-                          : FileImage(File(resolvedPath)) as ImageProvider,
-                      fit: BoxFit.cover)
-                      : null,
-                ),
-                child: resolvedPath == null
-                    ? _isEditing
-                    ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_circle_outline, color: Colors.grey[600], size: 32),
-                      const SizedBox(height: 8),
-                      Text(
-                        "ADD $category",
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+              if (resolvedPath == null) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0ECE7),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                )
-                    : _buildBrokenImagePlaceholder(category)
-                    : null,
+                  child: _isEditing
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_circle_outline,
+                                  color: Colors.grey[500], size: 28),
+                              const SizedBox(height: 6),
+                              Text(
+                                "ADD $category",
+                                style: TextStyle(
+                                  fontFamily: 'BarlowCondensed',
+                                  color: Colors.grey[500],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w300,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      : _buildBrokenImagePlaceholder(category),
+                );
+              }
+
+              final ImageProvider imageProvider = resolvedPath.startsWith('http')
+                  ? NetworkImage(resolvedPath)
+                  : FileImage(File(resolvedPath)) as ImageProvider;
+
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Shape shadow
+                  Transform.translate(
+                    offset: const Offset(0, 4),
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: ColorFiltered(
+                        colorFilter: ColorFilter.mode(
+                          Colors.black.withOpacity(0.22),
+                          BlendMode.srcIn,
+                        ),
+                        child: Image(image: imageProvider, fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                  // Actual image
+                  Image(image: imageProvider, fit: BoxFit.contain),
+                ],
               );
             },
           ),
@@ -915,13 +1152,14 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
                   // Left Side (DELETE)
                   Expanded(
                     child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: () => _deleteItem(category, outfitIndex),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.grey.withOpacity(0.5),
                           borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(4),
-                            bottomLeft: Radius.circular(4),
+                            topLeft: Radius.circular(16),
+                            bottomLeft: Radius.circular(16),
                           ),
                         ),
                         child: const Center(
@@ -933,13 +1171,14 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
                   Expanded(
                     child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: () => _editItem(category, outfitIndex),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.5),
                           borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(4),
-                            bottomRight: Radius.circular(4),
+                            topRight: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
                           ),
                         ),
                         child: const Center(
@@ -956,93 +1195,119 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
     );
   }
 
-  Widget _buildAccessoryItem(String? accessoryUrl, int outfitIndex, int accessoryIndex) {
+  Widget _buildAccessoryItem(
+      String? accessoryUrl, int outfitIndex, int accessoryIndex) {
     return FutureBuilder<String?>(
-      future: accessoryUrl != null ? _resolveFilePath(accessoryUrl) : Future.value(null),
+      future: accessoryUrl != null
+          ? _resolveFilePath(accessoryUrl)
+          : Future.value(null),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
-            width: 80,
-            height: 80,
-            margin: const EdgeInsets.only(right: 8.0),
+            width: 96,
+            height: 96,
+            margin: const EdgeInsets.only(right: 10.0),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              color: Colors.grey[200],
+              color: const Color(0xFFF0ECE7),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            child:
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         }
 
         final resolvedPath = snapshot.data;
 
-        return Container(
-          width: 80, // Ensure consistent width
-          height: 80,
-          margin: const EdgeInsets.only(right: 8.0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Stack(
-            fit: StackFit.expand, // Make sure Stack takes full size
-            children: [
-              // IMAGE
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: resolvedPath != null
-                    ? Image(
-                  image: resolvedPath.startsWith('http')
-                      ? NetworkImage(resolvedPath)
-                      : FileImage(File(resolvedPath)) as ImageProvider,
-                  fit: BoxFit.cover, // Ensure it covers full space
-                )
-                    : _buildBrokenImagePlaceholder("Accessory"),
-              ),
+        ImageProvider? imageProvider;
+        if (resolvedPath != null) {
+          imageProvider = resolvedPath.startsWith('http')
+              ? NetworkImage(resolvedPath)
+              : FileImage(File(resolvedPath)) as ImageProvider;
+        }
 
-              // OVERLAY FOR EDIT & DELETE
-              if (_isEditing)
-                Positioned.fill(
-                  child: Row(
-                    children: [
-                      // Left Side (DELETE)
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _deleteAccessory(outfitIndex, accessoryIndex),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withOpacity(0.5),
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(4),
-                                bottomLeft: Radius.circular(4),
-                              ),
-                            ),
-                            child: const Center(
-                              child: Icon(Icons.delete, color: Colors.white),
-                            ),
-                          ),
+        return SizedBox(
+          width: 96,
+          height: 96,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 10.0),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (imageProvider != null) ...[
+                  // Shape shadow — blurred silhouette offset downward
+                  Transform.translate(
+                    offset: const Offset(0, 4),
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: ColorFiltered(
+                        colorFilter: ColorFilter.mode(
+                          Colors.black.withOpacity(0.22),
+                          BlendMode.srcIn,
                         ),
+                        child: Image(
+                            image: imageProvider, fit: BoxFit.contain),
                       ),
-
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _editAccessory(outfitIndex, accessoryIndex),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5),
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(4),
-                                bottomRight: Radius.circular(4),
-                              ),
-                            ),
-                            child: const Center(
-                              child: Icon(Icons.edit, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-            ],
+                  // Actual image
+                  Image(image: imageProvider, fit: BoxFit.contain),
+                ] else
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0ECE7),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: _buildBrokenImagePlaceholder("Accessory"),
+                  ),
+
+                // Edit/delete overlay
+                if (_isEditing)
+                  Positioned.fill(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () =>
+                                _deleteAccessory(outfitIndex, accessoryIndex),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.5),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(16),
+                                  bottomLeft: Radius.circular(16),
+                                ),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.delete, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () =>
+                                _editAccessory(outfitIndex, accessoryIndex),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(16),
+                                  bottomRight: Radius.circular(16),
+                                ),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.edit, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -1057,10 +1322,62 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
           const SizedBox(height: 4),
           Text(
             "NO $category",
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            style: const TextStyle(
+              fontFamily: 'BarlowCondensed',
+              color: Colors.grey,
+              fontSize: 14,
+              fontWeight: FontWeight.w300,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBottomActionButton({
+    required IconData icon,
+    required String label,
+    required bool isPrimary,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: _isSaving && label == 'ADD'
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: isPrimary ? Colors.white : const Color(0xFF242424),
+                ),
+              )
+            : Icon(icon, size: 18),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isPrimary ? const Color(0xFF242424) : Colors.white,
+          foregroundColor: isPrimary ? Colors.white : const Color(0xFF242424),
+          disabledBackgroundColor:
+              isPrimary ? const Color(0xFF242424) : Colors.white,
+          disabledForegroundColor:
+              isPrimary ? Colors.white : const Color(0xFF242424),
+          elevation: isPrimary ? 6 : 0,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color:
+                  isPrimary ? const Color(0xFF242424) : const Color(0xFFD8D2CC),
+            ),
+          ),
+          textStyle: const TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 17,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
       ),
     );
   }
@@ -1071,7 +1388,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
   void _editItem(String category, int outfitIndex) async {
     try {
-      print('Starting _editItem for category: $category, outfitIndex: $outfitIndex');
+      print(
+          'Starting _editItem for category: $category, outfitIndex: $outfitIndex');
 
       // First, check if the date and outfit exist
       final normalizedDate = _normalizeDate(selectedDate);
@@ -1079,7 +1397,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
           outfitsPerDay[normalizedDate] == null ||
           outfitsPerDay[normalizedDate]!.isEmpty ||
           outfitIndex >= outfitsPerDay[normalizedDate]!.length) {
-        print('Error: Invalid outfit data - Date: $normalizedDate, Index: $outfitIndex');
+        print(
+            'Error: Invalid outfit data - Date: $normalizedDate, Index: $outfitIndex');
         return;
       }
 
@@ -1089,7 +1408,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
       final result = await Navigator.push<Map<String, dynamic>?>(
         context,
         MaterialPageRoute(
-          builder: (_) => ItemSelectionPage(slot: category, fromCreateOutfit: true),
+          builder: (_) =>
+              ItemSelectionPage(slot: category, fromCreateOutfit: true),
         ),
       );
 
@@ -1142,8 +1462,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
       // Safely update the outfit with null checks
       if (currentOutfit.clothes != null && newImageUrl != null) {
         // Create a new map with the updated item
-        final updatedClothes = Map<String, String?>.from(currentOutfit.clothes);
-        updatedClothes[category] = newImageUrl;
+        final updatedClothes = normalizeOutfitClothes(currentOutfit.clothes);
+        updatedClothes[outfitSlotKey(category) ?? category] = newImageUrl;
 
         // Create a new outfit with the updated clothes
         final updatedOutfit = currentOutfit.copyWith(
@@ -1198,7 +1518,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
-        builder: (_) => ItemSelectionPage(slot: 'Accessories', fromCreateOutfit: true),
+        builder: (_) =>
+            ItemSelectionPage(slot: 'Accessories', fromCreateOutfit: true),
       ),
     );
 
@@ -1235,7 +1556,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
       if (newImageUrl != null && newImageUrl.isNotEmpty) {
         // Create a new list with the updated accessory
-        final updatedAccessories = List<String?>.from(currentOutfit.accessories);
+        final updatedAccessories =
+            List<String?>.from(currentOutfit.accessories);
         updatedAccessories[accessoryIndex] = newImageUrl;
 
         // Create a new outfit with the updated accessories
@@ -1258,7 +1580,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
-        builder: (_) => ItemSelectionPage(slot: 'Accessories', fromCreateOutfit: true),
+        builder: (_) =>
+            ItemSelectionPage(slot: 'Accessories', fromCreateOutfit: true),
       ),
     );
 
@@ -1285,9 +1608,11 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
         // If item is some other object, try to access imageUrl dynamically
         try {
           newImageUrl = (item as dynamic).imageUrl;
-          print('Add Accessory: Item is a dynamic object, imageUrl: $newImageUrl');
+          print(
+              'Add Accessory: Item is a dynamic object, imageUrl: $newImageUrl');
         } catch (e) {
-          print('Add Accessory: Error accessing imageUrl from dynamic object: $e');
+          print(
+              'Add Accessory: Error accessing imageUrl from dynamic object: $e');
         }
       }
 
@@ -1295,7 +1620,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
       if (newImageUrl != null && newImageUrl.isNotEmpty) {
         // Create a new list with the added accessory
-        final updatedAccessories = List<String?>.from(currentOutfit.accessories);
+        final updatedAccessories =
+            List<String?>.from(currentOutfit.accessories);
         updatedAccessories.add(newImageUrl);
 
         // Create a new outfit with the updated accessories
@@ -1316,21 +1642,23 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
   void _deleteAccessory(int outfitIndex, int accessoryIndex) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Remove Accessory'),
         content: const Text('Are you sure you want to remove this accessory?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
               final normalizedDate = _normalizeDate(selectedDate);
               final currentOutfit = outfitsPerDay[normalizedDate]![outfitIndex];
+              Navigator.pop(dialogContext);
 
               // Create a new list without the removed accessory
-              final updatedAccessories = List<String?>.from(currentOutfit.accessories);
+              final updatedAccessories =
+                  List<String?>.from(currentOutfit.accessories);
               updatedAccessories.removeAt(accessoryIndex);
 
               // Create a new outfit with the updated accessories
@@ -1338,13 +1666,11 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
                 accessories: updatedAccessories,
               );
 
-              setState(() {
-                outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
-              });
-
-              // Save the updated outfit to Hive
-              await _updateOutfit(outfitIndex);
-              Navigator.pop(context);
+              await _persistUpdatedOutfit(
+                normalizedDate,
+                outfitIndex,
+                updatedOutfit,
+              );
             },
             child: const Text('Remove'),
           ),
@@ -1357,41 +1683,86 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
   void _deleteItem(String category, int outfitIndex) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Remove Item'),
         content: Text('Are you sure you want to remove this $category?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
               final normalizedDate = _normalizeDate(selectedDate);
               final currentOutfit = outfitsPerDay[normalizedDate]![outfitIndex];
+              Navigator.pop(dialogContext);
 
               // Create a new map with the removed item
-              final updatedClothes = Map<String, String?>.from(currentOutfit.clothes);
-              updatedClothes[category] = null;
+              final updatedClothes = normalizeOutfitClothes(
+                currentOutfit.clothes,
+              );
+              updatedClothes[outfitSlotKey(category) ?? category] = null;
 
               // Create a new outfit with the updated clothes
               final updatedOutfit = currentOutfit.copyWith(
                 clothes: updatedClothes,
               );
 
-              setState(() {
-                outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
-              });
-
-              // Save the updated outfit to Hive
-              await _updateOutfit(outfitIndex);
-              Navigator.pop(context);
+              await _persistUpdatedOutfit(
+                normalizedDate,
+                outfitIndex,
+                updatedOutfit,
+              );
             },
             child: const Text('Remove'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _persistUpdatedOutfit(
+    DateTime normalizedDate,
+    int outfitIndex,
+    Outfit updatedOutfit,
+  ) async {
+    if (!outfitsPerDay.containsKey(normalizedDate) ||
+        outfitIndex >= outfitsPerDay[normalizedDate]!.length) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      outfitsPerDay[normalizedDate]![outfitIndex] = updatedOutfit;
+    });
+
+    try {
+      if (updatedOutfit.id == null || updatedOutfit.id!.isEmpty) {
+        final savedOutfit =
+            await OutfitStorageService.saveOutfit(updatedOutfit);
+        if (mounted &&
+            outfitsPerDay.containsKey(normalizedDate) &&
+            outfitIndex < outfitsPerDay[normalizedDate]!.length) {
+          outfitsPerDay[normalizedDate]![outfitIndex] = savedOutfit;
+        }
+      } else {
+        await OutfitStorageService.updateOutfit(updatedOutfit);
+      }
+
+      await _reloadOutfits();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating outfit: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadOutfits() async {
@@ -1421,7 +1792,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
       // Log the number of outfits per day for debugging
       outfitsPerDay.forEach((date, outfits) {
-        print('Date: ${DateFormat('yyyy-MM-dd').format(date)}, Outfits: ${outfits.length}');
+        print(
+            'Date: ${DateFormat('yyyy-MM-dd').format(date)}, Outfits: ${outfits.length}');
       });
 
       setState(() {
@@ -1445,7 +1817,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
     final normalizedDate = _normalizeDate(selectedDate);
     if (!outfitsPerDay.containsKey(normalizedDate) ||
         outfitIndex >= outfitsPerDay[normalizedDate]!.length) {
-      print('ERROR: Invalid outfit index: $outfitIndex for date: $normalizedDate');
+      print(
+          'ERROR: Invalid outfit index: $outfitIndex for date: $normalizedDate');
       setState(() {
         _isSaving = false;
       });
@@ -1472,7 +1845,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
         print('Saved outfit with new ID: $newId, Name: ${updatedOutfit.name}');
       } else {
         // We have an ID, so update the existing outfit
-        print('Updating existing outfit - ID: ${outfit.id}, Name: ${outfit.name}');
+        print(
+            'Updating existing outfit - ID: ${outfit.id}, Name: ${outfit.name}');
         await OutfitStorageService.updateOutfit(outfit);
         print('Updated outfit with ID: ${outfit.id}, Name: ${outfit.name}');
       }
@@ -1482,7 +1856,6 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
       setState(() {
         _isSaving = false;
       });
-
     } catch (e) {
       print('Error in _updateOutfit: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1533,7 +1906,6 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
       // Update UI
       setState(() {});
-
     } catch (e) {
       print('Error reloading outfits: $e');
     }
@@ -1564,7 +1936,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
         if (result is Outfit) {
           // Save the outfit directly
           final savedOutfit = await OutfitStorageService.saveOutfit(result);
-          print('Saved outfit with ID: ${savedOutfit.id}, Name: ${savedOutfit.name}');
+          print(
+              'Saved outfit with ID: ${savedOutfit.id}, Name: ${savedOutfit.name}');
 
           // Set the selected date to the outfit's date
           setState(() {
@@ -1598,7 +1971,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
         List<Color> colorPalette = [];
 
         if (newPalette['colorPalette'] != null) {
-          colorPalette = List<Color>.from(newPalette['colorPalette'] as List<dynamic>);
+          colorPalette =
+              List<Color>.from(newPalette['colorPalette'] as List<dynamic>);
           colorPaletteStrings = colorPalette
               .map((color) => '#${color.value.toRadixString(16).substring(2)}')
               .toList();
@@ -1624,9 +1998,10 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
               date: outfitDate,
               clothes: Map<String, String?>.from(newPalette['clothes']),
               accessories: (newPalette['accessories'] as List<dynamic>?)
-                  ?.where((item) => item != null)
-                  ?.cast<String>()
-                  ?.toList() ?? [], // Filter out nulls
+                      ?.where((item) => item != null)
+                      ?.cast<String>()
+                      ?.toList() ??
+                  [], // Filter out nulls
               colorPalette: colorPalette,
               colorPaletteStrings: colorPaletteStrings,
             );
@@ -1639,9 +2014,10 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
             date: outfitDate,
             clothes: Map<String, String?>.from(newPalette['clothes']),
             accessories: (newPalette['accessories'] as List<dynamic>?)
-                ?.where((item) => item != null)
-                ?.cast<String>()
-                ?.toList() ?? [], // Filter out nulls
+                    ?.where((item) => item != null)
+                    ?.cast<String>()
+                    ?.toList() ??
+                [], // Filter out nulls
             colorPalette: colorPalette,
             colorPaletteStrings: colorPaletteStrings,
           );
@@ -1649,7 +2025,8 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
 
         // Save the outfit
         await OutfitStorageService.saveOutfit(newOutfit);
-        print('Saved new outfit with ID: ${newOutfit.id}, Name: ${newOutfit.name}');
+        print(
+            'Saved new outfit with ID: ${newOutfit.id}, Name: ${newOutfit.name}');
 
         // Update the selected date to match the outfit's date
         setState(() {
@@ -1675,4 +2052,3 @@ class _OutfitsPageState extends State<OutfitsPage> with RouteAware {
     }
   }
 }
-

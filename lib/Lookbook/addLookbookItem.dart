@@ -72,7 +72,8 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
         }
 
         // Generate a unique filename
-        final fileName = 'lookbook_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final fileName =
+            'lookbook_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final savedPath = path.join(lookbookDir.path, fileName);
 
         // Copy the image
@@ -176,8 +177,12 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
         createdAt: widget.existingItem?.createdAt ?? DateTime.now(),
         imageUrl: _imagePath,
         tags: _tags,
-        notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
-        source: _sourceController.text.trim().isNotEmpty ? _sourceController.text.trim() : null,
+        notes: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : null,
+        source: _sourceController.text.trim().isNotEmpty
+            ? _sourceController.text.trim()
+            : null,
         colorPalette: _colorPalette,
       );
 
@@ -209,7 +214,7 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
       appBar: AppBar(
         title: Text(
           widget.existingItem != null ? 'EDIT INSPIRATION' : 'ADD INSPIRATION',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w300),
         ),
         centerTitle: true,
       ),
@@ -224,7 +229,8 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
                 showModalBottomSheet(
                   context: context,
                   shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(12)),
                   ),
                   builder: (context) => SafeArea(
                     child: Column(
@@ -271,7 +277,8 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
                 );
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0), // Reduced padding by half
+                padding: const EdgeInsets.symmetric(
+                    vertical: 4.0), // Reduced padding by half
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(5),
                   child: Container(
@@ -286,33 +293,39 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
                     ),
                     child: _imagePath != null
                         ? _imagePath!.startsWith('http')
-                        ? Image.network(
-                      _imagePath!,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                      ),
-                    )
-                        : Image.file(
-                      File(_imagePath!),
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                      ),
-                    )
+                            ? Image.network(
+                                _imagePath!,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Center(
+                                  child: Icon(Icons.broken_image,
+                                      size: 64, color: Colors.grey),
+                                ),
+                              )
+                            : Image.file(
+                                File(_imagePath!),
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Center(
+                                  child: Icon(Icons.broken_image,
+                                      size: 64, color: Colors.grey),
+                                ),
+                              )
                         : const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_photo_alternate, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text('Add Image', style: TextStyle(color: Colors.grey)),
-                          ],
-                        ),
-                      ),
-                    ),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 40),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_photo_alternate,
+                                      size: 64, color: Colors.grey),
+                                  SizedBox(height: 16),
+                                  Text('Add Image',
+                                      style: TextStyle(color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -335,7 +348,7 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
               children: [
                 const Text(
                   'Tags',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w300),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -412,13 +425,13 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.black54,
-                  ),
-                )
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.black54,
+                        ),
+                      )
                     : const Text('SAVE INSPIRATION'),
               ),
             ),
@@ -428,4 +441,3 @@ class _AddLookbookItemPageState extends State<AddLookbookItemPage> {
     );
   }
 }
-

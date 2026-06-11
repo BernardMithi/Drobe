@@ -31,10 +31,11 @@ class LookbookItem extends HiveObject {
   List<int> colorCodes = [];
 
   @HiveField(8)
-  String? userId;  // New field to track which user owns this lookbook item
+  String? userId; // New field to track which user owns this lookbook item
 
   // Non-persisted field, computed from colorCodes
-  List<Color> get colorPalette => colorCodes.map((code) => Color(code)).toList();
+  List<Color> get colorPalette =>
+      colorCodes.map((code) => Color(code)).toList();
 
   LookbookItem({
     this.id,
@@ -45,9 +46,8 @@ class LookbookItem extends HiveObject {
     this.notes,
     this.source,
     List<Color>? colorPalette,
-    this.userId,  // Add to constructor
-  }) :
-        tags = tags ?? [],
+    this.userId, // Add to constructor
+  })  : tags = tags ?? [],
         colorCodes = colorPalette?.map((color) => color.value).toList() ?? [];
 
   // Create a copy of this lookbook item with optional new values
@@ -60,7 +60,7 @@ class LookbookItem extends HiveObject {
     String? notes,
     String? source,
     List<Color>? colorPalette,
-    String? userId,  // Add to copyWith
+    String? userId, // Add to copyWith
   }) {
     return LookbookItem(
       id: id ?? this.id,
@@ -71,7 +71,7 @@ class LookbookItem extends HiveObject {
       notes: notes ?? this.notes,
       source: source ?? this.source,
       colorPalette: colorPalette ?? this.colorPalette,
-      userId: userId ?? this.userId,  // Include in copyWith
+      userId: userId ?? this.userId, // Include in copyWith
     );
   }
 
@@ -83,13 +83,16 @@ class LookbookItem extends HiveObject {
         name: map['name'] as String? ?? 'Unnamed Inspiration',
         createdAt: map['createdAt'] is DateTime
             ? map['createdAt']
-            : DateTime.tryParse(map['createdAt'] as String? ?? '') ?? DateTime.now(),
+            : DateTime.tryParse(map['createdAt'] as String? ?? '') ??
+                DateTime.now(),
         imageUrl: map['imageUrl'] as String?,
         tags: (map['tags'] as List<dynamic>?)?.cast<String>().toList() ?? [],
         notes: map['notes'] as String?,
         source: map['source'] as String?,
-        colorPalette: (map['colorCodes'] as List?)?.map((code) => Color(code as int)).toList(),
-        userId: map['userId'] as String?,  // Add to fromMap
+        colorPalette: (map['colorCodes'] as List?)
+            ?.map((code) => Color(code as int))
+            .toList(),
+        userId: map['userId'] as String?, // Add to fromMap
       );
     } catch (e) {
       debugPrint('Error creating LookbookItem from map: $e');
@@ -112,7 +115,7 @@ class LookbookItem extends HiveObject {
       'notes': notes,
       'source': source,
       'colorCodes': colorCodes,
-      'userId': userId,  // Add to toMap
+      'userId': userId, // Add to toMap
     };
   }
 
@@ -121,4 +124,3 @@ class LookbookItem extends HiveObject {
     return 'LookbookItem(id: $id, name: $name, tags: $tags, userId: $userId)';
   }
 }
-

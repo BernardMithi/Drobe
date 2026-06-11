@@ -46,7 +46,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         debugPrint('Failed to initialize notifications');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to initialize notifications. Some features may not work.'),
+            content: Text(
+                'Failed to initialize notifications. Some features may not work.'),
             duration: Duration(seconds: 5),
           ),
         );
@@ -82,9 +83,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _specialOffers = prefs.getBool('special_offers') ?? true;
         _newFeatures = prefs.getBool('new_features') ?? true;
 
-        _outfitReminderTime = prefs.getString('outfit_reminder_time') ?? '7:00 AM';
-        _laundryReminderDay = prefs.getString('laundry_reminder_day') ?? 'Sunday';
-        _laundryReminderTime = prefs.getString('laundry_reminder_time') ?? '10:00 AM';
+        _outfitReminderTime =
+            prefs.getString('outfit_reminder_time') ?? '7:00 AM';
+        _laundryReminderDay =
+            prefs.getString('laundry_reminder_day') ?? 'Sunday';
+        _laundryReminderTime =
+            prefs.getString('laundry_reminder_time') ?? '10:00 AM';
 
         _isLoading = false;
       });
@@ -130,7 +134,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         if (_outfitReminders) {
           final outfitSuccess = await _scheduleOutfitReminders();
           if (outfitSuccess) {
-            debugPrint('Outfit reminders scheduled successfully for $_outfitReminderTime');
+            debugPrint(
+                'Outfit reminders scheduled successfully for $_outfitReminderTime');
           } else {
             debugPrint('Failed to schedule outfit reminders');
           }
@@ -143,7 +148,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         if (_laundryReminders) {
           final laundrySuccess = await _scheduleLaundryReminders();
           if (laundrySuccess) {
-            debugPrint('Laundry reminders scheduled successfully for $_laundryReminderDay at $_laundryReminderTime');
+            debugPrint(
+                'Laundry reminders scheduled successfully for $_laundryReminderDay at $_laundryReminderTime');
           } else {
             debugPrint('Failed to schedule laundry reminders');
           }
@@ -193,7 +199,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
 
     if (_laundryReminders) {
-      enabledNotifications.add('laundry reminders on $_laundryReminderDay at $_laundryReminderTime');
+      enabledNotifications.add(
+          'laundry reminders on $_laundryReminderDay at $_laundryReminderTime');
     }
 
     if (enabledNotifications.isEmpty) {
@@ -204,7 +211,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<bool> _scheduleOutfitReminders() async {
-    final success = await _notificationService.scheduleOutfitReminder(_outfitReminderTime);
+    final success =
+        await _notificationService.scheduleOutfitReminder(_outfitReminderTime);
     if (!success) {
       debugPrint('Failed to schedule outfit reminders');
     }
@@ -213,9 +221,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Future<bool> _scheduleLaundryReminders() async {
     final success = await _notificationService.scheduleLaundryReminder(
-        _laundryReminderDay,
-        _laundryReminderTime
-    );
+        _laundryReminderDay, _laundryReminderTime);
     if (!success) {
       debugPrint('Failed to schedule laundry reminders');
     }
@@ -246,7 +252,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           'NOTIFICATIONS',
           style: TextStyle(
             color: Colors.black,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w300,
             fontSize: 18,
           ),
         ),
@@ -258,117 +264,115 @@ class _NotificationsPageState extends State<NotificationsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildCard(
-            title: 'General Notifications',
-            children: [
-              _buildSwitchItem(
-                title: 'Push Notifications',
-                subtitle: 'Receive push notifications on your device',
-                value: _pushNotifications,
-                onChanged: (value) {
-                  setState(() {
-                    _pushNotifications = value;
-                  });
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildCard(
-            title: 'Outfit Planning Reminders',
-            children: [
-              _buildSwitchItem(
-                title: 'Daily Outfit Reminders',
-                subtitle: 'Get a reminder to plan your outfit for tomorrow',
-                value: _outfitReminders,
-                onChanged: (value) {
-                  setState(() {
-                    _outfitReminders = value;
-                  });
-                },
-              ),
-              if (_outfitReminders)
-                _buildTimeSelector(
-                  title: 'Reminder Time',
-                  subtitle: 'When to receive your outfit reminder',
-                  time: _outfitReminderTime,
-                  onTap: _showOutfitTimePicker,
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildCard(
+                  title: 'General Notifications',
+                  children: [
+                    _buildSwitchItem(
+                      title: 'Push Notifications',
+                      subtitle: 'Receive push notifications on your device',
+                      value: _pushNotifications,
+                      onChanged: (value) {
+                        setState(() {
+                          _pushNotifications = value;
+                        });
+                      },
+                    ),
+                  ],
                 ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildCard(
-            title: 'Laundry Reminders',
-            children: [
-              _buildSwitchItem(
-                title: 'Weekly Laundry Reminders',
-                subtitle: 'Get a reminder to do your laundry',
-                value: _laundryReminders,
-                onChanged: (value) {
-                  setState(() {
-                    _laundryReminders = value;
-                  });
-                },
-              ),
-              if (_laundryReminders)
-                ...[
-                  _buildDaySelector(
-                    title: 'Reminder Day',
-                    subtitle: 'Which day to receive your laundry reminder',
-                    day: _laundryReminderDay,
-                    onTap: _showLaundryDayPicker,
-                  ),
-                  _buildTimeSelector(
-                    title: 'Reminder Time',
-                    subtitle: 'When to receive your laundry reminder',
-                    time: _laundryReminderTime,
-                    onTap: _showLaundryTimePicker,
-                  ),
-                ],
-            ],
-          ),
-
-
-        ],
-      ),
+                const SizedBox(height: 16),
+                _buildCard(
+                  title: 'Outfit Planning Reminders',
+                  children: [
+                    _buildSwitchItem(
+                      title: 'Daily Outfit Reminders',
+                      subtitle:
+                          'Get a reminder to plan your outfit for tomorrow',
+                      value: _outfitReminders,
+                      onChanged: (value) {
+                        setState(() {
+                          _outfitReminders = value;
+                        });
+                      },
+                    ),
+                    if (_outfitReminders)
+                      _buildTimeSelector(
+                        title: 'Reminder Time',
+                        subtitle: 'When to receive your outfit reminder',
+                        time: _outfitReminderTime,
+                        onTap: _showOutfitTimePicker,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildCard(
+                  title: 'Laundry Reminders',
+                  children: [
+                    _buildSwitchItem(
+                      title: 'Weekly Laundry Reminders',
+                      subtitle: 'Get a reminder to do your laundry',
+                      value: _laundryReminders,
+                      onChanged: (value) {
+                        setState(() {
+                          _laundryReminders = value;
+                        });
+                      },
+                    ),
+                    if (_laundryReminders) ...[
+                      _buildDaySelector(
+                        title: 'Reminder Day',
+                        subtitle: 'Which day to receive your laundry reminder',
+                        day: _laundryReminderDay,
+                        onTap: _showLaundryDayPicker,
+                      ),
+                      _buildTimeSelector(
+                        title: 'Reminder Time',
+                        subtitle: 'When to receive your laundry reminder',
+                        time: _laundryReminderTime,
+                        onTap: _showLaundryTimePicker,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
       bottomNavigationBar: _isLoading
           ? const SizedBox.shrink()
           : Padding(
-        padding: const EdgeInsets.all(40),
-        child: SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
-            onPressed: _saveSettings,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey[300],
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
+              padding: const EdgeInsets.all(40),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _saveSettings,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[300],
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Text(
+                          'SAVE SETTINGS',
+                          style: TextStyle(
+                            fontFamily: 'BarlowCondensed',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w300,
+                          ),
+                        ),
+                ),
               ),
             ),
-            child: _isLoading
-                ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.black,
-              ),
-            )
-                : const Text(
-              'SAVE SETTINGS',
-              style: TextStyle(
-                fontFamily: 'Avenir',
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -395,7 +399,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               title,
               style: const TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w300,
                 color: Colors.black,
               ),
             ),
@@ -424,7 +428,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   title,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w200,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -468,7 +472,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     title,
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w200,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -491,7 +495,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               child: Text(
                 time,
                 style: const TextStyle(
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w200,
                 ),
               ),
             ),
@@ -521,7 +525,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     title,
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w200,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -544,7 +548,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               child: Text(
                 day,
                 style: const TextStyle(
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w200,
                 ),
               ),
             ),
@@ -626,7 +630,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   void _showLaundryDayPicker() async {
     final List<String> days = [
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
     ];
 
     final String? selectedDay = await showDialog<String>(
@@ -661,4 +671,3 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 }
-

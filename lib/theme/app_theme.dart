@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -12,67 +13,68 @@ class AppTheme {
   static const Color dividerColor = Color(0xFFBDBDBD); // Light Grey
 
   // Text Styles
-  static const String fontFamily = 'Avenir'; // Or 'Nunito' if using alternative
+  static const String fontFamily = 'BarlowCondensed';
+  static const String displayFontFamily = 'BarlowCondensed';
 
   static TextTheme textTheme = TextTheme(
     displayLarge: TextStyle(
-      fontFamily: fontFamily,
-      fontSize: 24,
-      fontWeight: FontWeight.bold,
+      fontFamily: displayFontFamily,
+      fontSize: 32,
+      fontWeight: FontWeight.w200,
       color: textPrimaryColor,
     ),
     displayMedium: TextStyle(
-      fontFamily: fontFamily,
-      fontSize: 20,
-      fontWeight: FontWeight.bold,
+      fontFamily: displayFontFamily,
+      fontSize: 26,
+      fontWeight: FontWeight.w200,
       color: textPrimaryColor,
     ),
     displaySmall: TextStyle(
-      fontFamily: fontFamily,
-      fontSize: 18,
-      fontWeight: FontWeight.bold,
+      fontFamily: displayFontFamily,
+      fontSize: 22,
+      fontWeight: FontWeight.w200,
       color: textPrimaryColor,
     ),
     headlineMedium: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 20,
-      fontWeight: FontWeight.w600,
+      fontSize: 22,
+      fontWeight: FontWeight.w300,
       color: textPrimaryColor,
     ),
     headlineSmall: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 18,
-      fontWeight: FontWeight.w600,
+      fontSize: 20,
+      fontWeight: FontWeight.w300,
       color: textPrimaryColor,
     ),
     titleLarge: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
+      fontSize: 18,
+      fontWeight: FontWeight.w300,
       color: textPrimaryColor,
     ),
     bodyLarge: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 14,
-      fontWeight: FontWeight.normal,
+      fontSize: 16,
+      fontWeight: FontWeight.w300,
       color: textPrimaryColor,
     ),
     bodyMedium: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 13,
-      fontWeight: FontWeight.normal,
+      fontSize: 15,
+      fontWeight: FontWeight.w300,
       color: textPrimaryColor,
     ),
     bodySmall: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 11,
-      fontWeight: FontWeight.normal,
-      color: textSecondaryColor,
+      fontSize: 13,
+      fontWeight: FontWeight.w300,
+      color: Color(0xFF5F5A54),
     ),
     labelLarge: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 14,
-      fontWeight: FontWeight.w600,
+      fontSize: 16,
+      fontWeight: FontWeight.w300,
       color: primaryColor,
     ),
   );
@@ -103,18 +105,20 @@ class AppTheme {
     labelStyle: TextStyle(
       fontFamily: fontFamily,
       fontSize: 16,
-      color: textSecondaryColor,
+      fontWeight: FontWeight.w300,
+      color: Color(0xFF5F5A54),
     ),
     // Hint style
     hintStyle: TextStyle(
       fontFamily: fontFamily,
       fontSize: 16,
-      color: textSecondaryColor.withOpacity(0.6),
+      fontWeight: FontWeight.w300,
+      color: Color(0xFF8A847D),
     ),
     // Error style
     errorStyle: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 12,
+      fontSize: 13,
       color: errorColor,
     ),
     // Add some padding inside the text field
@@ -131,8 +135,8 @@ class AppTheme {
       backgroundColor: primaryColor,
       textStyle: TextStyle(
         fontFamily: fontFamily,
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
+        fontSize: 16,
+        fontWeight: FontWeight.w300,
       ),
       padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
       shape: RoundedRectangleBorder(
@@ -147,8 +151,8 @@ class AppTheme {
       foregroundColor: primaryColor,
       textStyle: TextStyle(
         fontFamily: fontFamily,
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
+        fontSize: 16,
+        fontWeight: FontWeight.w300,
       ),
       padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
       side: BorderSide(color: secondaryColor, width: 1.5),
@@ -164,7 +168,7 @@ class AppTheme {
       textStyle: TextStyle(
         fontFamily: fontFamily,
         fontSize: 16,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w300,
       ),
       padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
     ),
@@ -178,10 +182,10 @@ class AppTheme {
     centerTitle: false,
     titleTextStyle: TextStyle(
       fontFamily: fontFamily,
-      fontSize: 18, // Slightly smaller to accommodate uppercase
-      fontWeight: FontWeight.w600,
+      fontSize: 20,
+      fontWeight: FontWeight.w300,
       color: textPrimaryColor,
-      letterSpacing: 1.0, // Add slight letter spacing for better uppercase readability
+      letterSpacing: 0,
     ),
     iconTheme: IconThemeData(
       color: textPrimaryColor,
@@ -189,7 +193,7 @@ class AppTheme {
   );
 
   // Card Theme
-  static CardTheme cardTheme = CardTheme(
+  static CardThemeData cardTheme = CardThemeData(
     color: Colors.white,
     elevation: 2,
     shape: RoundedRectangleBorder(
@@ -216,6 +220,12 @@ class AppTheme {
     textButtonTheme: textButtonTheme,
     appBarTheme: appBarTheme,
     cardTheme: cardTheme,
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+      },
+    ),
     dividerTheme: DividerThemeData(
       color: dividerColor,
       thickness: 1,
@@ -252,8 +262,7 @@ class AppTheme {
 
   // You can also create a dark theme if needed
   static ThemeData darkTheme = ThemeData(
-    // Dark theme configuration
-    // ...
-  );
+      // Dark theme configuration
+      // ...
+      );
 }
-

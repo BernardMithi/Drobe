@@ -15,8 +15,18 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
   List<String> _selectedCategories = [];
 
   final List<String> _allCategories = [
-    'cotton', 'wool', 'silk', 'denim', 'synthetic', 'leather', 'linen',
-    'cashmere', 'care', 'washing', 'sustainability', 'capsule wardrobe'
+    'cotton',
+    'wool',
+    'silk',
+    'denim',
+    'synthetic',
+    'leather',
+    'linen',
+    'cashmere',
+    'care',
+    'washing',
+    'sustainability',
+    'capsule wardrobe'
   ];
 
   @override
@@ -45,7 +55,8 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
 
       // Filter by selected categories
       final matchesCategories = _selectedCategories.isEmpty ||
-          tip.categories.any((category) => _selectedCategories.contains(category));
+          tip.categories
+              .any((category) => _selectedCategories.contains(category));
 
       return matchesQuery && matchesCategories;
     }).toList();
@@ -67,7 +78,7 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
       appBar: AppBar(
         title: const Text(
           'FABRIC TIPS',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w300),
         ),
         centerTitle: true,
       ),
@@ -78,51 +89,72 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: TextField(
               controller: _searchController,
+              style: const TextStyle(
+                fontFamily: 'BarlowCondensed',
+                fontSize: 16,
+                fontWeight: FontWeight.w300,
+              ),
               decoration: InputDecoration(
-                hintText: 'Search fabric tips...',
-                prefixIcon: const Icon(Icons.search),
+                hintText: 'Search tips...',
+                hintStyle: const TextStyle(
+                  fontFamily: 'BarlowCondensed',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w300,
+                  color: Color(0xFFBDB5AB),
+                ),
+                prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFFBDB5AB)),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFEAE4DC)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFEAE4DC)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF8A847D)),
                 ),
                 filled: true,
-                fillColor: Colors.grey.shade50,
+                fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             ),
           ),
 
           // Category filters
-          SizedBox(
-            height: 50,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: _allCategories.map((category) {
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            child: Row(
+              children: _allCategories.map((category) {
                   final isSelected = _selectedCategories.contains(category);
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: FilterChip(
-                      label: Text(
-                        category,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
-                          fontSize: 12,
+                    padding: const EdgeInsets.only(right: 6),
+                    child: GestureDetector(
+                      onTap: () => _toggleCategory(category),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF1F1A17) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF1F1A17) : const Color(0xFFDED8CF),
+                          ),
                         ),
-                      ),
-                      selected: isSelected,
-                      onSelected: (_) => _toggleCategory(category),
-                      backgroundColor: Colors.grey.shade200,
-                      selectedColor: Colors.black87,
-                      checkmarkColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            fontFamily: 'BarlowCondensed',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w300,
+                            color: isSelected ? Colors.white : const Color(0xFF5F5A54),
+                          ),
+                        ),
                       ),
                     ),
                   );
                 }).toList(),
-              ),
             ),
           ),
 
@@ -130,233 +162,159 @@ class _FabricTipsPageState extends State<FabricTipsPage> {
           Expanded(
             child: filteredTips.isEmpty
                 ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.search_off,
-                    size: 64,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No fabric tips found',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey.shade600,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No fabric tips found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your search or filters',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Try adjusting your search or filters',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-                ],
-              ),
-            )
+                  )
                 : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: filteredTips.length,
-              itemBuilder: (context, index) {
-                final tip = filteredTips[index];
-                return _buildTipCard(context, tip);
-              },
-            ),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    itemCount: filteredTips.length,
+                    itemBuilder: (context, index) {
+                      final tip = filteredTips[index];
+                      return _buildTipCard(context, tip, featured: index == 0);
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTipCard(BuildContext context, FabricTip tip) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FabricTipDetailPage(tip: tip),
+  Widget _buildTipCard(BuildContext context, FabricTip tip, {bool featured = false}) {
+    final imageHeight = featured ? 220.0 : 160.0;
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FabricTipDetailPage(tip: tip),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 3),
             ),
-          );
-        },
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
+            // Full-width image
             SizedBox(
-              height: 180,
+              height: imageHeight,
               width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    tip.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: Colors.grey.shade200,
-                      child: const Center(
-                        child: Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
-                      ),
-                    ),
+              child: Image.network(
+                tip.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: const Color(0xFFF2EEE8),
+                  child: const Center(
+                    child: Icon(Icons.image_not_supported, size: 36, color: Color(0xFFBDB5AB)),
                   ),
-                  // Gradient overlay
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.7),
-                          ],
-                          stops: const [0.6, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Title overlay
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        tip.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                              offset: Offset(1, 1),
-                              blurRadius: 3,
-                              color: Colors.black45,
-                            ),
-                          ],
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-
-            // Content
+            // Content below image
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Description
-                  Text(
-                    tip.description,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade800,
-                      height: 1.4,
+                  if (tip.categories.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        tip.categories.first.toUpperCase(),
+                        style: const TextStyle(
+                          fontFamily: 'BarlowCondensed',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: 1.8,
+                          color: Color(0xFFAD8B72),
+                        ),
+                      ),
                     ),
-                    maxLines: 3,
+                  Text(
+                    tip.title,
+                    style: TextStyle(
+                      fontFamily: 'BarlowCondensed',
+                      fontSize: featured ? 22 : 19,
+                      fontWeight: FontWeight.w300,
+                      color: const Color(0xFF1C1A18),
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 16),
-
-                  // Categories and metadata
-                  Row(
-                    children: [
-                      // Author avatar
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Colors.grey.shade300,
-                        child: Text(
-                          tip.author.substring(0, 1),
-                          style: TextStyle(
-                            color: Colors.grey.shade800,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // Author name
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tip.author,
+                  const SizedBox(height: 8),
+                  Text(
+                    tip.description,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF8A847D),
+                      height: 1.5,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (tip.categories.length > 1) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        ...tip.categories.skip(1).take(2).map((cat) => Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF2EEE8),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              cat,
                               style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            Text(
-                              tip.date,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
+                                fontFamily: 'BarlowCondensed',
                                 fontSize: 12,
+                                fontWeight: FontWeight.w300,
+                                color: Color(0xFF7A736B),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-
-                      // Read more button
-                      TextButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FabricTipDetailPage(tip: tip),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.arrow_forward, size: 16),
-                        label: const Text('Read More'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.black87,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Categories
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: tip.categories.take(3).map((category) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          category,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade800,
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                        )),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

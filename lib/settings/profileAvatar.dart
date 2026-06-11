@@ -154,8 +154,8 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
             style: TextStyle(
               color: widget.textColor,
               fontSize: widget.size * 0.4,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Avenir',
+              fontWeight: FontWeight.w300,
+              fontFamily: 'BarlowCondensed',
             ),
           ),
         ),
@@ -163,4 +163,3 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
     }
   }
 }
-

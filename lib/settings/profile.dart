@@ -122,7 +122,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
         final directory = await getApplicationDocumentsDirectory();
         final userId = _userData['id'] ?? 'default';
-        final profileImagePath = path.join(directory.path, 'profile_$userId.jpg');
+        final profileImagePath =
+            path.join(directory.path, 'profile_$userId.jpg');
 
         // Copy the selected image to the app's documents directory
         final File imageFile = File(image.path);
@@ -136,7 +137,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile picture updated successfully')),
+            const SnackBar(
+                content: Text('Profile picture updated successfully')),
           );
         }
       }
@@ -161,6 +163,10 @@ class _ProfilePageState extends State<ProfilePage> {
       context,
       MaterialPageRoute(builder: (context) => const PasswordChangePage()),
     );
+  }
+
+  void _navigateToSettings() {
+    Navigator.pushNamed(context, '/settings');
   }
 
   void _logout() async {
@@ -190,7 +196,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   Navigator.pushNamedAndRemoveUntil(
                     context,
                     '/login',
-                        (route) => false,
+                    (route) => false,
                   );
                 } else if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -222,153 +228,170 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PROFILE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text('PROFILE',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w300)),
         centerTitle: true,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Profile picture section
-            Center(
-              child: GestureDetector(
-                onTap: _selectProfileImage,
-                child: Stack(
-                  children: [
-                    ProfileAvatar(
-                      key: ValueKey('profile_avatar_${DateTime.now().millisecondsSinceEpoch}'),
-                      size: 120,
-                      userId: _userData['id'] ?? '',
-                      name: _userData['name'] ?? '',
-                      email: _userData['email'] ?? '',
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: Icon(
-                          Icons.camera_alt,
-                          size: 24,
-                          color: Colors.grey[800],
-                        ),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Profile picture section
+                  Center(
+                    child: GestureDetector(
+                      onTap: _selectProfileImage,
+                      child: Stack(
+                        children: [
+                          ProfileAvatar(
+                            key: ValueKey(
+                                'profile_avatar_${DateTime.now().millisecondsSinceEpoch}'),
+                            size: 120,
+                            userId: _userData['id'] ?? '',
+                            name: _userData['name'] ?? '',
+                            email: _userData['email'] ?? '',
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: Icon(
+                                Icons.camera_alt,
+                                size: 24,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Profile form
-            Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  // Name field
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your name';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Email field
-                  TextFormField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.email),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!value.contains('@') || !value.contains('.')) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
                   ),
 
                   const SizedBox(height: 24),
 
-                  // Save button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _saveProfile,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
+                  // Profile form
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        // Name field
+                        TextFormField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Name',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your name';
+                            }
+                            return null;
+                          },
                         ),
-                      )
-                          : const Text('SAVE CHANGES'),
-                    ),
-                  ),
 
-                  const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                  // Change password button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _navigateToPasswordChange,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('CHANGE PASSWORD'),
-                    ),
-                  ),
+                        // Email field
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.email),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!value.contains('@') || !value.contains('.')) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
 
-                  const SizedBox(height: 16),
+                        const SizedBox(height: 24),
 
-                  // Logout button
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: _logout,
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('LOGOUT'),
+                        // Save button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isSaving ? null : _saveProfile,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: _isSaving
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('SAVE CHANGES'),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Settings button
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _navigateToSettings,
+                            icon: const Icon(Icons.settings_outlined),
+                            label: const Text('SETTINGS'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Change password button
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: _navigateToPasswordChange,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text('CHANGE PASSWORD'),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Logout button
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: _logout,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text('LOGOUT'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }
-

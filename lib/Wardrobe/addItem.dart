@@ -1,22 +1,27 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
-import 'package:drobe/models/item.dart';
-import 'package:drobe/services/hiveServiceManager.dart';
-import 'package:drobe/auth/authService.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:palette_generator/palette_generator.dart';
-import 'package:drobe/services/removeBackground.dart';
-import 'package:http/http.dart' as http;
 import 'dart:math' show min;
+
+import 'package:drobe/auth/authService.dart';
+import 'package:drobe/models/item.dart';
+import 'package:drobe/services/itemStorage.dart';
+import 'package:drobe/services/removeBackground.dart';
+import 'package:drobe/theme/drobe_bottom_action.dart';
+import 'package:drobe/utils/category_utils.dart';
+import 'package:drobe/utils/image_utils.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:palette_generator/palette_generator.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'wardrobeTheme.dart';
 
 class AddItemPage extends StatefulWidget {
   final String category;
 
-  const AddItemPage({Key? key, required this.category}) : super(key: key);
+  const AddItemPage({super.key, required this.category});
 
   @override
   State<AddItemPage> createState() => _AddItemPageState();
@@ -30,13 +35,20 @@ class _AddItemPageState extends State<AddItemPage> {
   final TextEditingController _imageUrlController = TextEditingController();
   List<int> _selectedColors = [];
   bool _isSaving = false;
-  final HiveManager _hiveManager = HiveManager();
   String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _imageUrlController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCurrentUser() async {
@@ -48,16 +60,13 @@ class _AddItemPageState extends State<AddItemPage> {
         _currentUserId = userData['id'];
       });
 
-      if (_currentUserId == null || _currentUserId!.isEmpty) {
-        debugPrint('Warning: No current user ID available in AddItemPage');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please log in to add items'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
+      if ((_currentUserId ?? '').isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to add items'),
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
       debugPrint('Error loading current user: $e');
@@ -67,218 +76,317 @@ class _AddItemPageState extends State<AddItemPage> {
   void _showImageSourceOptions() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: WardrobeTheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Drag handle for a polished look
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: WardrobeTheme.line,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                 ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Take Photo'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.image),
-                title: const Text('Choose from Gallery'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.link),
-                title: const Text('Enter URL'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showEnterUrlDialog();
-                },
-              ),
-              const SizedBox(height: 10),
-            ],
+                const SizedBox(height: 16),
+                const Text(
+                  'ADD IMAGE',
+                  style: TextStyle(
+                    fontFamily: 'BarlowCondensed',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w300,
+                    letterSpacing: 0.8,
+                    color: WardrobeTheme.ink,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Choose the cleanest source for this piece.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: WardrobeTheme.mutedInk,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildSheetOption(
+                  icon: CupertinoIcons.camera,
+                  title: 'Take photo',
+                  subtitle: 'Capture a new piece now',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                const SizedBox(height: 10),
+                _buildSheetOption(
+                  icon: CupertinoIcons.photo,
+                  title: 'Choose from gallery',
+                  subtitle: 'Use an existing image from your library',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                const SizedBox(height: 10),
+                _buildSheetOption(
+                  icon: CupertinoIcons.link,
+                  title: 'Enter image URL',
+                  subtitle: 'Paste a product or editorial image link',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showEnterUrlDialog();
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSheetOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: WardrobeTheme.pageBackground,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: WardrobeTheme.surfaceAlt,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: WardrobeTheme.ink, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontFamily: 'BarlowCondensed',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w300,
+                        letterSpacing: 0.4,
+                        color: WardrobeTheme.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        height: 1.35,
+                        color: WardrobeTheme.mutedInk,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                CupertinoIcons.arrow_up_right,
+                size: 16,
+                color: WardrobeTheme.mutedInk,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await ImagePicker().pickImage(source: source);
-    if (pickedFile != null) {
-      // Show loading indicator
+    if (pickedFile == null) return;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Removing background...')),
+      );
+    }
+
+    final originalFile = File(pickedFile.path);
+
+    try {
+      final processedFile = await removeBackground(originalFile);
+      final fileToUse = processedFile ?? originalFile;
+
+      if (!mounted) return;
+      setState(() {
+        _selectedImage = fileToUse;
+        _imageUrl = null;
+      });
+
+      final successMessage = processedFile != null
+          ? 'Background removed successfully'
+          : 'Image added (background removal failed)';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(successMessage)),
+      );
+
+      _extractColorsFromImage(fileToUse);
+    } catch (e) {
+      debugPrint('Error picking image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Removing background..."))
+          SnackBar(content: Text('Error processing image: $e')),
         );
-      }
-
-      // Create a File from the picked image path
-      final originalFile = File(pickedFile.path);
-
-      try {
-        // Remove background from the image
-        final processedFile = await removeBackground(originalFile);
-
-        // If background removal was successful, use the processed file
-        // Otherwise fall back to the original file
-        final fileToUse = processedFile ?? originalFile;
-
-        if (mounted) {
-          setState(() {
-            _selectedImage = fileToUse;
-            _imageUrl = null;
-          });
-
-          // Show appropriate message based on background removal success
-          final successMessage = processedFile != null
-              ? "Background removed successfully"
-              : "Image added (background removal failed)";
-
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(successMessage))
-          );
-        }
-      } catch (e) {
-        debugPrint("Error removing background: $e");
-        if (mounted) {
-          // If there was an error, still use the original image
-          setState(() {
-            _selectedImage = originalFile;
-            _imageUrl = null;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Background removal failed. Using original image."))
-          );
-        }
       }
     }
   }
 
-  Future<void> _showEnterUrlDialog() async {
-    await showDialog(
+  void _showEnterUrlDialog() {
+    showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Enter Image URL"),
-          content: TextField(
-            controller: _imageUrlController,
-            decoration: const InputDecoration(hintText: "https://example.com/image.jpg"),
+      builder: (context) => AlertDialog(
+        backgroundColor: WardrobeTheme.surface,
+        surfaceTintColor: WardrobeTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: WardrobeTheme.line),
+        ),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        title: const Text(
+          'Paste image URL',
+          style: TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 24,
+            fontWeight: FontWeight.w300,
+            color: WardrobeTheme.ink,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
+        ),
+        content: TextField(
+          controller: _imageUrlController,
+          decoration: InputDecoration(
+            hintText: 'https://',
+            hintStyle: const TextStyle(color: WardrobeTheme.mutedInk),
+            filled: true,
+            fillColor: WardrobeTheme.pageBackground,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(color: WardrobeTheme.line),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final url = _imageUrlController.text.trim();
-                Navigator.pop(context);
-                await _processImageFromUrl(url);
-              },
-              child: const Text("Confirm"),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(color: WardrobeTheme.line),
             ),
-          ],
-        );
-      },
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(color: WardrobeTheme.accent),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: WardrobeTheme.mutedInk),
+            ),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: WardrobeTheme.ink,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final url = _imageUrlController.text.trim();
+              if (url.isNotEmpty) {
+                _processImageUrl(url);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Use image'),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _processImageFromUrl(String url) async {
-    if (!mounted) return;
-
-    // Show loading indicator
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Downloading image..."))
-    );
+  Future<void> _processImageUrl(String url) async {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Removing background...')),
+      );
+    }
 
     try {
-      // Download the image
       final response = await http.get(Uri.parse(url));
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          response.bodyBytes.isEmpty) {
+        throw Exception('Could not download image');
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final uriPath = Uri.parse(url).path;
+      final extension =
+          path.extension(uriPath).isNotEmpty ? path.extension(uriPath) : '.jpg';
+      final tempFile = File(
+        path.join(
+          tempDir.path,
+          'url_image_${DateTime.now().millisecondsSinceEpoch}$extension',
+        ),
+      );
+      await tempFile.writeAsBytes(response.bodyBytes);
+
+      final processedFile = await removeBackground(tempFile);
+      final fileToUse = processedFile ?? tempFile;
 
       if (!mounted) return;
+      setState(() {
+        _selectedImage = fileToUse;
+        _imageUrl = null;
+      });
 
-      if (response.statusCode == 200) {
-        // First save to a temporary file
-        final tempDir = await getTemporaryDirectory();
-        final tempFile = File('${tempDir.path}/temp_download.png');
-        await tempFile.writeAsBytes(response.bodyBytes);
+      final successMessage = processedFile != null
+          ? 'Background removed successfully'
+          : 'Image added (background removal failed)';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(successMessage)),
+      );
 
-        // Show background removal in progress
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Removing background..."))
-          );
-        }
-
-        // Remove background from the image
-        final processedFile = await removeBackground(tempFile);
-
-        // If background removal failed, use the original image
-        final fileToSave = processedFile ?? tempFile;
-
-        // Ensure the wardrobe_images directory exists
-        final appDir = await getApplicationDocumentsDirectory();
-        final wardrobeDir = Directory('${appDir.path}/wardrobe_images');
-        if (!await wardrobeDir.exists()) {
-          await wardrobeDir.create(recursive: true);
-        }
-
-        // Generate a unique filename with timestamp
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final fileName = 'img_$timestamp.png';
-        final savedFile = File('${wardrobeDir.path}/$fileName');
-
-        // Copy the processed file to the final location
-        await fileToSave.copy(savedFile.path);
-
-        // Update state only if still mounted
-        if (!mounted) return;
-
-        setState(() {
-          _selectedImage = savedFile;
-          _imageUrl = 'wardrobe_images/$fileName'; // Store the relative path
-        });
-
-        // Show success message with appropriate text based on background removal success
-        if (mounted) {
-          final successMessage = processedFile != null
-              ? "Image downloaded and background removed successfully"
-              : "Image downloaded successfully (background removal failed)";
-
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(successMessage))
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Failed to download image: HTTP ${response.statusCode}"))
-          );
-        }
-      }
+      _extractColorsFromImage(fileToUse);
     } catch (e) {
-      debugPrint("Error processing URL image: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Error processing image: ${e.toString().substring(0, min(50, e.toString().length))}..."))
-        );
-      }
+      debugPrint('Error processing image URL: $e');
+      if (!mounted) return;
+      setState(() {
+        _imageUrl = url;
+        _selectedImage = null;
+      });
+      _extractColorsFromNetworkImage(url);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Using image URL without background removal')),
+      );
     }
   }
 
@@ -286,129 +394,58 @@ class _AddItemPageState extends State<AddItemPage> {
     try {
       final paletteGenerator = await PaletteGenerator.fromImageProvider(
         FileImage(imageFile),
-        size: const Size(200, 200),
-        maximumColorCount: 3, // Limit to 3 main colors
+        maximumColorCount: 6,
       );
 
       setState(() {
-        _selectedColors = paletteGenerator.paletteColors
-            .take(3)
-            .map((color) => color.color.value)
+        _selectedColors = paletteGenerator.colors
+            .map((color) => color.value)
+            .take(min(5, paletteGenerator.colors.length))
             .toList();
       });
     } catch (e) {
-      debugPrint("Error extracting colors: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to extract colors: ${e.toString()}"))
-        );
-      }
+      debugPrint('Error extracting colors: $e');
     }
   }
 
-  Future<void> _openColorPicker() async {
-    if (_selectedColors.length >= 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You can only select up to 5 colors.")),
+  Future<void> _extractColorsFromNetworkImage(String imageUrl) async {
+    try {
+      final paletteGenerator = await PaletteGenerator.fromImageProvider(
+        NetworkImage(imageUrl),
+        maximumColorCount: 6,
       );
-      return;
+
+      setState(() {
+        _selectedColors = paletteGenerator.colors
+            .map((color) => color.value)
+            .take(min(5, paletteGenerator.colors.length))
+            .toList();
+      });
+    } catch (e) {
+      debugPrint('Error extracting network colors: $e');
     }
-
-    Color selectedColor = Colors.black;
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Pick a Color"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ColorPicker(
-                pickerColor: selectedColor,
-                enableAlpha: false,
-                showLabel: false,
-                onColorChanged: (color) {
-                  selectedColor = color;
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, null),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (!_selectedColors.contains(selectedColor.value)) {
-                  setState(() {
-                    _selectedColors.add(selectedColor.value);
-                    if (_selectedColors.length > 5) {
-                      _selectedColors = _selectedColors.take(5).toList();
-                    }
-                  });
-                }
-                Navigator.pop(context);
-              },
-              child: const Text("Select"),
-            ),
-          ],
-        );
-      },
-    );
   }
 
-  Future<String> saveImagePermanently(File imageFile) async {
-    // Get application documents directory
-    final appDir = await getApplicationDocumentsDirectory();
-
-    // Create a dedicated folder for images
-    final imagesDir = Directory('${appDir.path}/wardrobe_images');
-    if (!await imagesDir.exists()) {
-      await imagesDir.create(recursive: true);
+  Future<String?> _saveImageLocally(File imageFile) async {
+    try {
+      return await saveImagePermanently(imageFile);
+    } catch (e) {
+      debugPrint('Error saving image locally: $e');
+      return null;
     }
-
-    // Generate unique filename
-    final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}.${imageFile.path.split('.').last}';
-
-    // Full destination path
-    final destPath = '${imagesDir.path}/$fileName';
-
-    // Copy file to permanent location
-    await imageFile.copy(destPath);
-
-    // Return only the RELATIVE path (important!)
-    return 'wardrobe_images/$fileName';
   }
 
   Future<void> _saveItem() async {
-    if (_currentUserId == null || _currentUserId!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You must be logged in to add items")),
-      );
-      return;
-    }
-
-    // Check if required fields are filled
-    if (_selectedImage == null && (_imageUrl == null || _imageUrl!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please add an image for your item")),
-      );
-      return;
-    }
-
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a name for your item")),
+        const SnackBar(content: Text('Please enter a name for this item')),
       );
       return;
     }
 
-    // Optional: Check if colors are selected
-    if (_selectedColors.isEmpty) {
+    if (_currentUserId == null || _currentUserId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select at least one color for your item")),
+        const SnackBar(content: Text('Please log in to save items')),
       );
       return;
     }
@@ -418,232 +455,617 @@ class _AddItemPageState extends State<AddItemPage> {
     });
 
     try {
-      String imageUrl = '';
+      String finalImageUrl = _imageUrl ?? '';
 
       if (_selectedImage != null) {
-        // Convert File to String path (store as relative path)
-        imageUrl = await saveImagePermanently(_selectedImage!);
-      } else if (_imageUrl != null) {
-        if (_imageUrl!.startsWith('http')) {
-          imageUrl = _imageUrl!;
-        } else {
-          imageUrl = _imageUrl!; // Already a relative path
+        final localPath = await _saveImageLocally(_selectedImage!);
+        if (localPath != null) {
+          finalImageUrl = localPath;
         }
       }
 
-      // Create the new item with the current user ID
       final newItem = Item(
-        id: 'item_${DateTime.now().millisecondsSinceEpoch}',
-        imageUrl: imageUrl,
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim(),
+        imageUrl: finalImageUrl,
+        category: wardrobeCategoryKey(widget.category),
         colors: _selectedColors,
-        category: widget.category,
-        userId: _currentUserId, // Set the user ID explicitly
+        userId: _currentUserId!,
       );
 
-      // Get the box and add the item
-      final box = await _hiveManager.getBox('itemsBox');
-      await box.add(newItem);
+      final savedItem = await ItemStorageService.saveItem(newItem);
 
-      debugPrint('Item added successfully: ID=${newItem.id}, Name=${newItem.name}, UserID=${newItem.userId}, Category=${newItem.category}');
-
-      if (mounted) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Item added successfully")),
-        );
-
-        // Return true to indicate success to the calling screen
-        Navigator.pop(context, true);
-      }
+      if (!mounted) return;
+      Navigator.pop(context, savedItem);
     } catch (e) {
       debugPrint('Error saving item: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving item: $e')),
+        );
+      }
+    } finally {
       if (mounted) {
         setState(() {
           _isSaving = false;
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error saving item: ${e.toString()}")),
-        );
       }
     }
+  }
+
+  void _openColorPicker() {
+    Color tempColor = Colors.brown;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: WardrobeTheme.surface,
+        surfaceTintColor: WardrobeTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: WardrobeTheme.line),
+        ),
+        title: const Text(
+          'Add colour',
+          style: TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 24,
+            fontWeight: FontWeight.w300,
+            color: WardrobeTheme.ink,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: tempColor,
+            onColorChanged: (color) {
+              tempColor = color;
+            },
+            pickerAreaHeightPercent: 0.7,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: WardrobeTheme.mutedInk),
+            ),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: WardrobeTheme.ink,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              setState(() {
+                _selectedColors.add(tempColor.value);
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _removeSelectedImage() async {
+    setState(() {
+      _selectedImage = null;
+      _imageUrl = null;
+      _selectedColors = [];
+      _imageUrlController.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: WardrobeTheme.pageBackground,
       appBar: AppBar(
-        title: const Text("ADD NEW ITEM"),
+        backgroundColor: WardrobeTheme.pageBackground,
+        foregroundColor: WardrobeTheme.ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Image Picker (Tap to Choose)
-              GestureDetector(
-                onTap: _showImageSourceOptions,
-                child: Container(
-                  height: 400,
-                  width: 400,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: _selectedImage != null
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(2),
-                    child: Image.file(
-                      // If the file path starts with "file://", remove it.
-                      File(_selectedImage!.path.startsWith("file://")
-                          ? _selectedImage!.path.replaceFirst(RegExp(r'^file://'), '')
-                          : _selectedImage!.path),
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                      : _imageUrl != null
-                      ? (_imageUrl!.startsWith("http")
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(2),
-                    child: Image.network(_imageUrl!, fit: BoxFit.cover),
-                  )
-                      : FutureBuilder<String>(
-                    future: getApplicationDocumentsDirectory().then(
-                            (dir) => '${dir.path}/$_imageUrl'),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const CircularProgressIndicator();
-                      }
-                      if (snapshot.hasData && snapshot.data != null) {
-                        final file = File(snapshot.data!);
-                        if (file.existsSync()) {
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: Image.file(file, fit: BoxFit.cover),
-                          );
-                        }
-                      }
-                      return const Icon(Icons.image_not_supported, size: 100, color: Colors.grey);
-                    },
-                  ))
-                      : const Icon(Icons.image, size: 100, color: Colors.grey),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.category.toUpperCase(),
+              style: WardrobeTheme.eyebrow,
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'ADD NEW PIECE',
+              style: TextStyle(
+                fontFamily: 'BarlowCondensed',
+                fontSize: 22,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 0.8,
+                color: WardrobeTheme.ink,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: TextButton(
+              onPressed: _isSaving ? null : _saveItem,
+              child: Text(
+                _isSaving ? 'Saving...' : 'Save',
+                style: const TextStyle(
+                  fontFamily: 'BarlowCondensed',
+                  fontSize: 18,
+                  letterSpacing: 0.8,
+                  color: WardrobeTheme.ink,
                 ),
               ),
-              const SizedBox(height: 20),
-              // Name Input Field
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: "NAME",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Description Input Field
-              TextField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: "DESCRIPTION",
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-                maxLength: 100,
-              ),
-              const SizedBox(height: 5),
-              // Color Picker Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton(
-                    onPressed: _openColorPicker,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text("SELECT COLOURS"),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: _selectedImage != null ? () => _extractColorsFromImage(_selectedImage!) : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text("GENERATE COLOURS"),
-                  ),
-                ],
-              ),
-              // Display Selected Colors
-              if (_selectedColors.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8.0,
-                  runSpacing: 8.0,
-                  children: _selectedColors.map((colorInt) {
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedColors.remove(colorInt);
-                        });
-                      },
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: Color(colorInt),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black12, width: 1),
-                        ),
-                        child: const Icon(Icons.close, size: 16, color: Colors.white),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-              const SizedBox(height: 20),
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveItem,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[300],
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.black54,
-                    ),
-                  )
-                      : const Text("SAVE ITEM", style: TextStyle(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(height: 30),
-            ],
+            ),
           ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: DrobeBottomAction.floatingBarPadding(context),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: WardrobeTheme.ink,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+              onPressed: _isSaving ? null : _saveItem,
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'SAVE ITEM',
+                      style: TextStyle(
+                        fontFamily: 'BarlowCondensed',
+                        fontSize: 17,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildImageSectionFlex()),
+            const SizedBox(height: 12),
+            _buildDetailsPanel(),
+            const SizedBox(height: 12),
+            _buildColourPanel(),
+            const SizedBox(height: 10),
+          ],
         ),
       ),
     );
   }
-}
 
+  Widget _buildIntroPanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        color: WardrobeTheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: WardrobeTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: WardrobeTheme.surfaceAlt,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              'CURATION NOTE',
+              style: TextStyle(
+                fontFamily: 'BarlowCondensed',
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 1.8,
+                color: WardrobeTheme.accent,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Add a new ${widget.category.toLowerCase()} piece with a clean image, a concise title and a clear palette.',
+            style: WardrobeTheme.body,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePanel() {
+    return _buildSectionShell(
+      title: 'IMAGE',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: _showImageSourceOptions,
+            child: Container(
+              height: 280,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: WardrobeTheme.pageBackground,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: WardrobeTheme.line),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: _buildImagePreview(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _showImageSourceOptions,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: WardrobeTheme.ink,
+                    side: const BorderSide(color: WardrobeTheme.line),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: const Icon(CupertinoIcons.photo_on_rectangle),
+                  label: const Text('Choose image'),
+                ),
+              ),
+              if (_selectedImage != null || _imageUrl != null) ...[
+                const SizedBox(width: 10),
+                IconButton(
+                  onPressed: _removeSelectedImage,
+                  style: IconButton.styleFrom(
+                    backgroundColor: WardrobeTheme.surfaceAlt,
+                    foregroundColor: WardrobeTheme.ink,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(CupertinoIcons.trash),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageSectionFlex() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: WardrobeTheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: WardrobeTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+            child: Row(
+              children: [
+                Container(width: 34, height: 1, color: WardrobeTheme.accent),
+                const SizedBox(width: 10),
+                Text('IMAGE', style: WardrobeTheme.sectionLabel),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: GestureDetector(
+                onTap: _showImageSourceOptions,
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: WardrobeTheme.pageBackground,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: WardrobeTheme.line),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(17),
+                    child: _buildImagePreview(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _showImageSourceOptions,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: WardrobeTheme.ink,
+                      side: const BorderSide(color: WardrobeTheme.line),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                    ),
+                    icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 18),
+                    label: const Text(
+                      'Choose image',
+                      style: TextStyle(
+                        fontFamily: 'BarlowCondensed',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w300,
+                      ),
+                    ),
+                  ),
+                ),
+                if (_selectedImage != null || _imageUrl != null) ...[
+                  const SizedBox(width: 10),
+                  IconButton(
+                    onPressed: _removeSelectedImage,
+                    style: IconButton.styleFrom(
+                      backgroundColor: WardrobeTheme.surfaceAlt,
+                      foregroundColor: WardrobeTheme.ink,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(CupertinoIcons.trash, size: 18),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    if (_selectedImage != null) {
+      return Image.file(_selectedImage!, fit: BoxFit.cover);
+    }
+
+    if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+      return Image.network(
+        _imageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPreviewFallback(),
+      );
+    }
+
+    return _buildPreviewFallback();
+  }
+
+  Widget _buildPreviewFallback() {
+    return Container(
+      color: WardrobeTheme.pageBackground,
+      alignment: Alignment.center,
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            CupertinoIcons.photo,
+            size: 38,
+            color: WardrobeTheme.mutedInk,
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Add an image to start building the look.',
+            style: TextStyle(
+              fontSize: 14,
+              color: WardrobeTheme.mutedInk,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsPanel() {
+    return _buildSectionShell(
+      title: 'DETAILS',
+      child: _buildField(
+        controller: _nameController,
+        label: 'Name',
+        hint: 'Vintage wool overshirt',
+      ),
+    );
+  }
+
+  Widget _buildColourPanel() {
+    return _buildSectionShell(
+      title: 'COLOUR PALETTE',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              ..._selectedColors.asMap().entries.map(
+                    (entry) => GestureDetector(
+                      onLongPress: () {
+                        setState(() {
+                          _selectedColors.removeAt(entry.key);
+                        });
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: Color(entry.value),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _hex(entry.value),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: WardrobeTheme.mutedInk,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              GestureDetector(
+                onTap: _openColorPicker,
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: WardrobeTheme.pageBackground,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: WardrobeTheme.line),
+                  ),
+                  child: const Icon(
+                    CupertinoIcons.add,
+                    color: WardrobeTheme.ink,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionShell({required String title, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+        color: WardrobeTheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: WardrobeTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 1,
+                color: WardrobeTheme.accent,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: WardrobeTheme.sectionLabel,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    int maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 1.6,
+            color: WardrobeTheme.mutedInk,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          maxLines: maxLines,
+          style: const TextStyle(
+            fontSize: 14.5,
+            color: WardrobeTheme.ink,
+            height: 1.45,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: WardrobeTheme.mutedInk),
+            filled: true,
+            fillColor: WardrobeTheme.pageBackground,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(color: WardrobeTheme.line),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(color: WardrobeTheme.line),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: const BorderSide(color: WardrobeTheme.accent),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _hex(int colorValue) {
+    final rgb = colorValue & 0xFFFFFF;
+    return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  }
+}

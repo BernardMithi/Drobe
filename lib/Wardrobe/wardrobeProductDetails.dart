@@ -1,16 +1,59 @@
-import 'package:flutter/material.dart';
-import 'editItem.dart';
-import 'package:hive/hive.dart';
 import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:drobe/models/item.dart';
+import 'package:drobe/services/itemStorage.dart';
+import 'package:drobe/theme/drobe_bottom_action.dart';
+import 'package:drobe/theme/drobe_icon.dart';
+import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
+
+import 'editItem.dart';
+import 'wardrobeTheme.dart';
+
+class _TwoLineMenuIcon extends StatelessWidget {
+  const _TwoLineMenuIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 18,
+      height: 14,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Container(
+            width: 18,
+            height: 2,
+            decoration: BoxDecoration(
+              color: WardrobeTheme.ink,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: 12,
+            height: 2,
+            decoration: BoxDecoration(
+              color: WardrobeTheme.ink,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class ProductDetailsPage extends StatefulWidget {
   final Item item;
-  const ProductDetailsPage({Key? key, required this.item}) : super(key: key);
+
+  const ProductDetailsPage({super.key, required this.item});
 
   @override
-  _ProductDetailsPageState createState() => _ProductDetailsPageState();
+  State<ProductDetailsPage> createState() => _ProductDetailsPageState();
 }
 
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
@@ -25,17 +68,14 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     itemsBox = Hive.box('itemsBox');
     item = widget.item;
     _selectedColors = item.colors ?? [];
-
-    // Get the full image path
     _getFullImagePath();
   }
 
-  // Add this method to get the full path
   Future<void> _getFullImagePath() async {
-    if (item.imageUrl.isNotEmpty && !item.imageUrl.startsWith("http")) {
+    if (item.imageUrl.isNotEmpty && !item.imageUrl.startsWith('http')) {
       try {
         final directory = await getApplicationDocumentsDirectory();
-        final fullPath = "${directory.path}/${item.imageUrl}";
+        final fullPath = '${directory.path}/${item.imageUrl}';
         final file = File(fullPath);
 
         if (file.existsSync()) {
@@ -44,7 +84,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           });
         }
       } catch (e) {
-        print("Error getting full path: $e");
+        debugPrint('Error getting full path: $e');
       }
     }
   }
@@ -52,8 +92,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   void _moveToLaundry() {
     setState(() {
       item.moveToLaundry();
-
-      // Save the updated item to Hive
       _saveItemChanges();
     });
   }
@@ -61,231 +99,552 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   void _markAsClean() {
     setState(() {
       item.markAsClean();
-
-      // Save the updated item to Hive
       _saveItemChanges();
     });
   }
 
-  // Add this method to save item changes to Hive
   void _saveItemChanges() {
     try {
-      int itemIndex = itemsBox.values.toList().indexWhere((i) => i.id == item.id);
+      final itemIndex =
+          itemsBox.values.toList().indexWhere((i) => i.id == item.id);
       if (itemIndex != -1) {
         itemsBox.putAt(itemIndex, item);
-        print("Item updated in Hive: ${item.id}");
+        debugPrint('Item updated in Hive: ${item.id}');
       }
     } catch (e) {
-      print("Error saving item changes: $e");
+      debugPrint('Error saving item changes: $e');
     }
   }
 
+  Future<void> _openEditPage() async {
+    final result = await Navigator.push<Object?>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditItemPage(item: item),
+      ),
+    );
+
+    if (result == EditItemResult.deleted) {
+      if (!mounted) return;
+      Navigator.pop(context, EditItemResult.deleted);
+      return;
+    }
+
+    if (result is! Item) {
+      return;
+    }
+
+    final updatedItem = await ItemStorageService.updateItem(result);
+
+    if (!mounted) return;
+
+    setState(() {
+      item = updatedItem;
+      _selectedColors = item.colors ?? [];
+      _fullImagePath = null;
+    });
+
+    await _getFullImagePath();
+  }
+
+  bool get _isAccessory => item.category.toLowerCase() == 'accessories';
+
   @override
   Widget build(BuildContext context) {
-    // Check if the item is an accessory
-    bool isAccessory = item.category.toLowerCase() == "accessories";
-
     return Scaffold(
+      backgroundColor: WardrobeTheme.pageBackground,
       appBar: AppBar(
+        backgroundColor: WardrobeTheme.pageBackground,
+        foregroundColor: WardrobeTheme.ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        title: const SizedBox.shrink(),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              int itemIndex = itemsBox.values.toList().indexWhere((i) => i.id == item.id);
-              if (itemIndex != -1) {
-                final result = await Navigator.push<dynamic>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EditItemPage(itemIndex: itemIndex),
-                  ),
-                );
-
-                if (result == true) {
-                  // ✅ Navigate back to `wardrobeCategory.dart` if item was deleted
-                  if (mounted) {
-                    Navigator.pop(context);
-                  }
-                } else if (result is Item) {
-                  // Update the local item with the edited one
-                  setState(() {
-                    item = result;
-                    _selectedColors = List<int>.from(item.colors ?? []);
-
-                    // Reset the full path and recalculate it
-                    _fullImagePath = null;
-                    _getFullImagePath();
-                  });
-
-                  // Return the updated item to the previous screen
-                  Navigator.pop(context, item);
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: PopupMenuButton<String>(
+              tooltip: 'Options',
+              color: WardrobeTheme.pageBackground,
+              surfaceTintColor: WardrobeTheme.pageBackground,
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: WardrobeTheme.line),
+              ),
+              position: PopupMenuPosition.under,
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _openEditPage();
                 }
-              }
-            },
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Text('Edit'),
+                ),
+              ],
+              child: const SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: _TwoLineMenuIcon(),
+                ),
+              ),
+            ),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () {},
-              child: Container(
-                height: 400,
-                width: 400,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Builder(
-                  builder: (context) {
-                    if (item.imageUrl.isEmpty) {
-                      return const Icon(Icons.image, size: 100, color: Colors.grey);
-                    }
-
-                    if (item.imageUrl.startsWith("http")) {
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          item.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            print("Error loading network image: $error");
-                            return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    } else if (_fullImagePath != null) {
-                      // Use the full path if available
-                      final file = File(_fullImagePath!);
-                      try {
-                        return ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.file(
-                            file,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              print("Error loading file image with full path: $error");
-                              return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
-                            },
-                          ),
-                        );
-                      } catch (e) {
-                        print("Error showing image with full path: $e");
-                        return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
-                      }
-                    } else {
-                      // Fallback to trying the direct path
-                      try {
-                        final file = File(item.imageUrl);
-                        if (file.existsSync()) {
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              file,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                print("Error loading file image: $error");
-                                return const Icon(Icons.broken_image, size: 100, color: Colors.grey);
-                              },
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        print("Error checking file: $e");
-                      }
-                      return const Icon(Icons.image_not_supported, size: 100, color: Colors.grey);
-                    }
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              item.name,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              item.description,
-              style: const TextStyle(fontSize: 15, color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
-            // Only show status if the item is NOT an accessory
-            if (!isAccessory)
-              Text(
-                item.inLaundry ? "Status: In Laundry" : "Status: Clean",
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
-              ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 8.0,
-              children: _selectedColors.map((colorInt) {
-                return Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: Color(colorInt),
-                    border: Border.all(color: Colors.black12),
-                    borderRadius: BorderRadius.circular(40),
-                  ),
-                );
-              }).toList(),
-            ),
-
-            // Only show laundry buttons if the item is NOT an accessory
-            if (!isAccessory) ...[
-              Expanded(child: Container()),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 42.0),
+      bottomNavigationBar: _isAccessory
+          ? null
+          : SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: DrobeBottomAction.floatingBarPadding(context),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    ElevatedButton(
-                      onPressed: _moveToLaundry,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[300],
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                    Expanded(
+                      child: _buildActionButton(
+                        icon: Icons.local_laundry_service_outlined,
+                        label: 'IN LAUNDRY',
+                        isActive: item.inLaundry,
+                        activeColor: WardrobeTheme.warning,
+                        onPressed: _moveToLaundry,
                       ),
-                      child: const Text("IN LAUNDRY"),
                     ),
-                    ElevatedButton(
-                      onPressed: _markAsClean,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[300],
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildActionButton(
+                        icon: Icons.checkroom_outlined,
+                        label: 'MARK CLEAN',
+                        isActive: !item.inLaundry,
+                        activeColor: WardrobeTheme.success,
+                        onPressed: _markAsClean,
                       ),
-                      child: const Text("MARK AS CLEAN"),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(14, 4, 14, _isAccessory ? 14 : 12),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildImageCard(),
+                const SizedBox(height: 10),
+                _buildEditorialSummary(),
+                const SizedBox(height: 10),
+                _buildColorPanel(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageCard() {
+    return Expanded(
+      flex: 7,
+      child: Container(
+        decoration: BoxDecoration(
+          color: WardrobeTheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: WardrobeTheme.line),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(19),
+          child: AspectRatio(
+            aspectRatio: 1.16,
+            child: _buildItemImage(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemImage() {
+    if (item.imageUrl.isEmpty) {
+      return _buildImageFallback();
+    }
+
+    if (item.imageUrl.startsWith('http')) {
+      return Image.network(
+        item.imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildImageFallback(),
+      );
+    }
+
+    if (_fullImagePath != null) {
+      return Image.file(
+        File(_fullImagePath!),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildImageFallback(),
+      );
+    }
+
+    return Container(
+      color: WardrobeTheme.surfaceAlt,
+      child: const Center(
+        child: CircularProgressIndicator(
+          color: WardrobeTheme.accent,
+          strokeWidth: 2.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageFallback() {
+    return Container(
+      color: WardrobeTheme.surfaceAlt,
+      alignment: Alignment.center,
+      child: const Icon(
+        CupertinoIcons.square_stack_3d_up,
+        size: 48,
+        color: WardrobeTheme.mutedInk,
+      ),
+    );
+  }
+
+  Widget _buildEditorialSummary() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: WardrobeTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: WardrobeTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: WardrobeTheme.surfaceAlt,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              'CURATED PIECE',
+              style: TextStyle(
+                fontFamily: 'BarlowCondensed',
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 1.5,
+                color: WardrobeTheme.accent,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            item.name,
+            style: const TextStyle(
+              fontFamily: 'BarlowCondensed',
+              fontSize: 28,
+              fontWeight: FontWeight.w300,
+              height: 0.95,
+              letterSpacing: 0.2,
+              color: WardrobeTheme.ink,
+            ),
+          ),
+          if (item.description.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              item.description,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: WardrobeTheme.mutedInk,
+              ),
+            ),
+          ],
+          if (!_isAccessory) ...[
+            const SizedBox(height: 12),
+            _buildStatusPill(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaPanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: WardrobeTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: WardrobeTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 1,
+                color: WardrobeTheme.accent,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'DETAILS',
+                style: TextStyle(
+                  fontFamily: 'BarlowCondensed',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 1.5,
+                  color: WardrobeTheme.mutedInk,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildMetaRow('Category', item.category),
+          const SizedBox(height: 8),
+          _buildMetaRow(
+            'Wear status',
+            _isAccessory
+                ? 'Accessory item'
+                : item.inLaundry
+                    ? 'Currently in laundry'
+                    : 'Ready to wear',
+          ),
+          const SizedBox(height: 8),
+          _buildMetaRow(
+            'Palette count',
+            '${_selectedColors.length} shade${_selectedColors.length == 1 ? '' : 's'} saved',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaRow(String label, String value) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontFamily: 'BarlowCondensed',
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
+              letterSpacing: 1.3,
+              color: WardrobeTheme.mutedInk,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          flex: 2,
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.3,
+              color: WardrobeTheme.ink,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColorPanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: WardrobeTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: WardrobeTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 1,
+                color: WardrobeTheme.accent,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'COLOUR PALETTE',
+                style: TextStyle(
+                  fontFamily: 'BarlowCondensed',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 1.5,
+                  color: WardrobeTheme.mutedInk,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildColorSwatches(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusPill() {
+    final bool inLaundry = item.inLaundry;
+    final Color pillColor =
+        inLaundry ? WardrobeTheme.warning : WardrobeTheme.success;
+    final Color pillTint =
+        inLaundry ? const Color(0xFFF1E4D7) : const Color(0xFFE2E9DD);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: pillTint,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            inLaundry
+                ? Icons.local_laundry_service_outlined
+                : Icons.checkroom_outlined,
+            size: 16,
+            color: pillColor,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            inLaundry ? 'Currently in laundry' : 'Ready to wear',
+            style: TextStyle(
+              fontFamily: 'BarlowCondensed',
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0.8,
+              color: pillColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColorSwatches() {
+    if (_selectedColors.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        decoration: BoxDecoration(
+          color: WardrobeTheme.pageBackground,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Text(
+          'No colour notes saved for this piece yet.',
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.45,
+            color: WardrobeTheme.mutedInk,
+          ),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: _selectedColors.map((colorValue) {
+        final color = Color(colorValue);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  width: 3,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _colorHex(colorValue),
+              style: const TextStyle(
+                fontSize: 11,
+                color: WardrobeTheme.mutedInk,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  String _colorHex(int colorValue) {
+    final rgb = colorValue & 0xFFFFFF;
+    return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color activeColor,
+    required VoidCallback onPressed,
+  }) {
+    final Color background = isActive ? activeColor : WardrobeTheme.surface;
+    final Color foreground = isActive ? Colors.white : WardrobeTheme.ink;
+    final Color borderColor = isActive ? activeColor : WardrobeTheme.line;
+
+    return SizedBox(
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: background,
+          foregroundColor: foreground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: borderColor),
+          ),
+        ),
+        icon: Icon(icon, size: 18),
+        label: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 1.0,
+          ),
         ),
       ),
     );
   }
 }
-

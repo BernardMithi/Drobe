@@ -24,15 +24,7 @@ class OutfitStorageService {
       debugPrint('OutfitStorageService initialized successfully');
     } catch (e) {
       debugPrint('Error initializing OutfitStorageService: $e');
-      // Try to recover by deleting and recreating the box
-      try {
-        await Hive.deleteBoxFromDisk(_boxName);
-        _box = await Hive.openBox(_boxName);
-        debugPrint('OutfitStorageService recovered successfully');
-      } catch (e) {
-        debugPrint('Failed to recover OutfitStorageService: $e');
-        rethrow;
-      }
+      rethrow;
     }
   }
 
@@ -67,7 +59,8 @@ class OutfitStorageService {
       // Save to Hive
       await _box!.put(outfitWithUserId.id, outfitWithUserId);
 
-      debugPrint('Saved outfit with ID: ${outfitWithUserId.id}, User ID: $userId');
+      debugPrint(
+          'Saved outfit with ID: ${outfitWithUserId.id}, User ID: $userId');
       return outfitWithUserId;
     } catch (e) {
       debugPrint('Error saving outfit: $e');
@@ -89,7 +82,8 @@ class OutfitStorageService {
 
       // Verify the outfit belongs to the current user
       final existingOutfit = await getOutfit(outfit.id!);
-      if (existingOutfit != null && existingOutfit.userId != null &&
+      if (existingOutfit != null &&
+          existingOutfit.userId != null &&
           existingOutfit.userId != userId) {
         throw Exception('Cannot update outfit: It belongs to another user');
       }
@@ -141,7 +135,8 @@ class OutfitStorageService {
       final userId = await _getCurrentUserId();
 
       if (userId == null) {
-        debugPrint('Warning: No current user ID available, returning empty outfit list');
+        debugPrint(
+            'Warning: No current user ID available, returning empty outfit list');
         return [];
       }
 
@@ -150,9 +145,9 @@ class OutfitStorageService {
 
       // Filter by user ID - ONLY include outfits that explicitly match the current user ID
       // or have no user ID (for backward compatibility)
-      final userOutfits = allOutfits.where((outfit) =>
-      outfit.userId == userId || outfit.userId == null
-      ).toList();
+      final userOutfits = allOutfits
+          .where((outfit) => outfit.userId == userId || outfit.userId == null)
+          .toList();
 
       debugPrint('Found ${userOutfits.length} outfits for user $userId');
       return userOutfits;
@@ -172,7 +167,8 @@ class OutfitStorageService {
 
       // Verify the outfit belongs to the current user
       final existingOutfit = await getOutfit(id);
-      if (existingOutfit != null && existingOutfit.userId != null &&
+      if (existingOutfit != null &&
+          existingOutfit.userId != null &&
           existingOutfit.userId != userId) {
         throw Exception('Cannot delete outfit: It belongs to another user');
       }
@@ -193,4 +189,3 @@ class OutfitStorageService {
     }
   }
 }
-

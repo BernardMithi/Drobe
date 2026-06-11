@@ -11,6 +11,8 @@ import 'package:intl/intl.dart';
 import 'package:drobe/main.dart';
 import 'package:drobe/settings/profileAvatar.dart';
 import 'package:drobe/auth/authService.dart';
+import 'package:drobe/theme/drobe_icon.dart';
+import 'package:drobe/theme/drobe_bottom_action.dart';
 
 class LookbookPage extends StatefulWidget {
   const LookbookPage({Key? key}) : super(key: key);
@@ -88,17 +90,20 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
     var filtered = _lookbookItems;
 
     if (_selectedTag != null) {
-      filtered = filtered.where((item) =>
-          item.tags.contains(_selectedTag!.toLowerCase())).toList();
+      filtered = filtered
+          .where((item) => item.tags.contains(_selectedTag!.toLowerCase()))
+          .toList();
     }
 
     // Then, apply search filter if any
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      filtered = filtered.where((item) =>
-      item.name.toLowerCase().contains(query) ||
-          (item.notes?.toLowerCase().contains(query) ?? false) ||
-          item.tags.any((tag) => tag.toLowerCase().contains(query))).toList();
+      filtered = filtered
+          .where((item) =>
+              item.name.toLowerCase().contains(query) ||
+              (item.notes?.toLowerCase().contains(query) ?? false) ||
+              item.tags.any((tag) => tag.toLowerCase().contains(query)))
+          .toList();
     }
 
     // Finally, sort the results
@@ -110,7 +115,8 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
         filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         break;
       case SortOption.alphabetical:
-        filtered.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        filtered.sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
         break;
     }
 
@@ -162,8 +168,19 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('LOOKBOOK', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF242424),
+        elevation: 0,
+        title: const Text(
+          'LOOKBOOK',
+          style: TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 20,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
         centerTitle: true,
         actions: [
           Padding(
@@ -181,9 +198,11 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
               child: FutureBuilder<Map<String, String>>(
                 future: AuthService().getCurrentUser(),
                 builder: (context, snapshot) {
-                  final userData = snapshot.data ?? {'id': '', 'name': '', 'email': ''};
+                  final userData =
+                      snapshot.data ?? {'id': '', 'name': '', 'email': ''};
                   return ProfileAvatar(
-                    key: ValueKey('outfits_avatar_${DateTime.now().millisecondsSinceEpoch}'),
+                    key: ValueKey(
+                        'outfits_avatar_${DateTime.now().millisecondsSinceEpoch}'),
                     size: 42,
                     userId: userData['id'] ?? '',
                     name: userData['name'] ?? '',
@@ -200,16 +219,24 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
           // Use Navigator.push().then() to ensure refresh happens when returning
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const AddLookbookItemPage()),
+            MaterialPageRoute(
+                builder: (context) => const AddLookbookItemPage()),
           ).then((_) {
             // Always refresh when returning from add screen
             _loadLookbookItems();
           });
         },
-        backgroundColor: Colors.grey[300],
+        elevation: 10,
+        backgroundColor: const Color(0xFF242424),
+        foregroundColor: Colors.white,
         shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: Colors.black),
+        child: const DrobeIcon(
+          name: DrobeIconName.add,
+          fallback: Icons.add,
+          color: Colors.white,
+        ),
       ),
+      floatingActionButtonLocation: const DrobeBottomFabLocation.end(),
       body: Column(
         children: [
           _buildSearchAndFilterBar(),
@@ -218,8 +245,8 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredItems.isEmpty
-                ? _buildEmptyState()
-                : _buildGridView(),
+                    ? _buildEmptyState()
+                    : _buildGridView(),
           ),
         ],
       ),
@@ -228,19 +255,44 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
 
   Widget _buildSearchAndFilterBar() {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(22, 16, 22, 10),
       child: Row(
         children: [
           // Search field
           Expanded(
             child: TextField(
+              style: const TextStyle(
+                fontFamily: 'BarlowCondensed',
+                fontSize: 18,
+                fontWeight: FontWeight.w300,
+                color: Color(0xFF242424),
+              ),
               decoration: InputDecoration(
                 hintText: 'Search inspirations',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                hintStyle: const TextStyle(
+                  fontFamily: 'BarlowCondensed',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w300,
+                  color: Color(0xFF8A847D),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF242424)),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.82),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: const BorderSide(color: Color(0xFFE4DDD5)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: const BorderSide(color: Color(0xFFE4DDD5)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF242424), width: 1.1),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
               onChanged: (value) {
                 setState(() {
@@ -252,28 +304,38 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
           ),
           const SizedBox(width: 8),
           // Sort button
-          PopupMenuButton<SortOption>(
-            icon: const Icon(Icons.sort),
-            onSelected: (SortOption option) {
-              setState(() {
-                _sortOption = option;
-                _applyFiltersAndSort();
-              });
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<SortOption>>[
-              const PopupMenuItem<SortOption>(
-                value: SortOption.newestFirst,
-                child: Text('Newest First'),
-              ),
-              const PopupMenuItem<SortOption>(
-                value: SortOption.oldestFirst,
-                child: Text('Oldest First'),
-              ),
-              const PopupMenuItem<SortOption>(
-                value: SortOption.alphabetical,
-                child: Text('Alphabetical'),
-              ),
-            ],
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE4DDD5)),
+            ),
+            child: PopupMenuButton<SortOption>(
+              icon: const Icon(Icons.tune, color: Color(0xFF242424)),
+              onSelected: (SortOption option) {
+                setState(() {
+                  _sortOption = option;
+                  _applyFiltersAndSort();
+                });
+              },
+              itemBuilder: (BuildContext context) =>
+                  <PopupMenuEntry<SortOption>>[
+                const PopupMenuItem<SortOption>(
+                  value: SortOption.newestFirst,
+                  child: Text('Newest First'),
+                ),
+                const PopupMenuItem<SortOption>(
+                  value: SortOption.oldestFirst,
+                  child: Text('Oldest First'),
+                ),
+                const PopupMenuItem<SortOption>(
+                  value: SortOption.alphabetical,
+                  child: Text('Alphabetical'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -282,20 +344,35 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
 
   Widget _buildTagsRow() {
     return Container(
-      height: 40,
-      margin: const EdgeInsets.only(bottom: 8),
+      height: 48,
+      margin: const EdgeInsets.only(bottom: 10),
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 22),
         children: [
           // "All" tag
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
-              label: const Text('All'),
+              label: Text(
+                'All',
+                style: TextStyle(
+                  fontFamily: 'BarlowCondensed',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w300,
+                  color: _selectedTag == null
+                      ? Colors.white
+                      : const Color(0xFF242424),
+                ),
+              ),
               selected: _selectedTag == null,
-              backgroundColor: Colors.grey[300],
-              selectedColor: Colors.grey[400],
+              backgroundColor: Colors.white,
+              selectedColor: const Color(0xFF242424),
+              checkmarkColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFFE4DDD5)),
+              ),
               onSelected: (selected) {
                 setState(() {
                   _selectedTag = null;
@@ -305,21 +382,38 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
             ),
           ),
           // Tag filters
-          ..._allTags.map((tag) => Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(tag),
-              selected: _selectedTag == tag,
-              backgroundColor: Colors.grey[300],
-              selectedColor: Colors.grey[400],
-              onSelected: (selected) {
-                setState(() {
-                  _selectedTag = selected ? tag : null;
-                  _applyFiltersAndSort();
-                });
-              },
-            ),
-          )).toList(),
+          ..._allTags
+              .map((tag) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(
+                        tag,
+                        style: TextStyle(
+                          fontFamily: 'BarlowCondensed',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w300,
+                          color: _selectedTag == tag
+                              ? Colors.white
+                              : const Color(0xFF242424),
+                        ),
+                      ),
+                      selected: _selectedTag == tag,
+                      backgroundColor: Colors.white,
+                      selectedColor: const Color(0xFF242424),
+                      checkmarkColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: Color(0xFFE4DDD5)),
+                      ),
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedTag = selected ? tag : null;
+                          _applyFiltersAndSort();
+                        });
+                      },
+                    ),
+                  ))
+              .toList(),
         ],
       ),
     );
@@ -380,12 +474,17 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
 
   Widget _buildGridView() {
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(
+        22,
+        4,
+        22,
+        DrobeBottomAction.scaffoldContentInset(context),
+      ),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.75,
+        crossAxisSpacing: 18,
+        mainAxisSpacing: 18,
+        childAspectRatio: 0.70,
       ),
       itemCount: _filteredItems.length,
       itemBuilder: (context, index) {
@@ -411,9 +510,11 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
       },
       child: Card(
         clipBehavior: Clip.antiAlias,
-        elevation: 2,
+        elevation: 0,
+        color: Colors.white.withValues(alpha: 0.86),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: Color(0xFFE4DDD5)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,8 +538,10 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Center(
+                          child: Icon(Icons.broken_image,
+                              size: 64, color: Colors.grey),
                         ),
                       );
                     } else {
@@ -447,8 +550,10 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Center(
+                          child: Icon(Icons.broken_image,
+                              size: 64, color: Colors.grey),
                         ),
                       );
                     }
@@ -467,7 +572,7 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
 
             // Item info
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min, // Use minimum vertical space
@@ -475,8 +580,11 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
                   Text(
                     item.name,
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontFamily: 'BarlowCondensed',
+                      fontWeight: FontWeight.w300,
+                      fontSize: 18,
+                      color: Color(0xFF242424),
+                      height: 1.05,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -485,29 +593,34 @@ class _LookbookPageState extends State<LookbookPage> with RouteAware {
                   Text(
                     DateFormat('MMM d, yyyy').format(item.createdAt),
                     style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                      fontFamily: 'BarlowCondensed',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w300,
+                      color: const Color(0xFF8A847D),
                     ),
                   ),
                   if (item.tags.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 7),
                     SizedBox(
-                      height: 20, // Fixed height for tags
+                      height: 26,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: item.tags.take(2).map((tag) {
                           return Container(
                             margin: const EdgeInsets.only(right: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(4),
+                              color: const Color(0xFFF2EEE8),
+                              borderRadius: BorderRadius.circular(9),
                             ),
                             child: Text(
                               tag,
                               style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[800],
+                                fontFamily: 'BarlowCondensed',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w300,
+                                color: const Color(0xFF5F5A54),
                               ),
                             ),
                           );
@@ -530,4 +643,3 @@ enum SortOption {
   oldestFirst,
   alphabetical,
 }
-

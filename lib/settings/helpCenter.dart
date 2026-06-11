@@ -13,27 +13,33 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   final List<FAQItem> _faqItems = [
     FAQItem(
       question: 'How do I create a new outfit?',
-      answer: 'To create a new outfit, tap the + button at the bottom of the Outfits screen. From there, you can select clothing items from your wardrobe and combine them into a new outfit. When you\'re done, give your outfit a name and save it.',
+      answer:
+          'To create a new outfit, tap the + button at the bottom of the Outfits screen. From there, you can select clothing items from your wardrobe and combine them into a new outfit. When you\'re done, give your outfit a name and save it.',
     ),
     FAQItem(
       question: 'How do I add items to my wardrobe?',
-      answer: 'To add items to your wardrobe, go to the Wardrobe tab and tap the + button. You can take a photo of your item, upload an existing photo from your gallery, or manually add details. Fill in the information about your item such as category, color, and brand.',
+      answer:
+          'To add items to your wardrobe, go to the Wardrobe tab and tap the + button. You can take a photo of your item, upload an existing photo from your gallery, or manually add details. Fill in the information about your item such as category, color, and brand.',
     ),
     FAQItem(
       question: 'Can I share my outfits on social media?',
-      answer: 'Yes! When viewing an outfit, tap the share icon to open sharing options. You can share your outfit to Instagram, Facebook, Pinterest or save it as an image to your device.',
+      answer:
+          'Yes! When viewing an outfit, tap the share icon to open sharing options. You can share your outfit to Instagram, Facebook, Pinterest or save it as an image to your device.',
     ),
     FAQItem(
       question: 'How do I plan outfits for future dates?',
-      answer: 'On the Outfits screen, select the date navigation at the top to move to a future date. Then add an outfit for that specific day by tapping the + button.',
+      answer:
+          'On the Outfits screen, select the date navigation at the top to move to a future date. Then add an outfit for that specific day by tapping the + button.',
     ),
     FAQItem(
       question: 'How do I reset my password?',
-      answer: 'If you forgot your password, go to the login screen and tap on "Forgot Password". Enter your email address and follow the instructions sent to your email to reset your password.',
+      answer:
+          'If you forgot your password, go to the login screen and tap on "Forgot Password". Enter your email address and follow the instructions sent to your email to reset your password.',
     ),
     FAQItem(
       question: 'Is my data backed up?',
-      answer: 'Yes, all your wardrobe items and outfits are automatically backed up to the cloud when you\'re connected to the internet. You can access your wardrobe from multiple devices using the same account.',
+      answer:
+          'Yes, all your wardrobe items and outfits are automatically backed up to the cloud when you\'re connected to the internet. You can access your wardrobe from multiple devices using the same account.',
     ),
   ];
 
@@ -60,8 +66,13 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     } else {
       setState(() {
         _filteredFaqItems = _faqItems
-            .where((item) => item.question.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-            item.answer.toLowerCase().contains(_searchController.text.toLowerCase()))
+            .where((item) =>
+                item.question
+                    .toLowerCase()
+                    .contains(_searchController.text.toLowerCase()) ||
+                item.answer
+                    .toLowerCase()
+                    .contains(_searchController.text.toLowerCase()))
             .toList();
       });
     }
@@ -79,7 +90,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
           'HELP CENTER',
           style: TextStyle(
             color: Colors.black,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w300,
             fontSize: 18,
           ),
         ),
@@ -121,37 +132,38 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
           Expanded(
             child: _filteredFaqItems.isEmpty
                 ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No results found',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off,
+                            size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No results found',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                            fontWeight: FontWeight.w200,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try a different search term',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Try a different search term',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            )
+                  )
                 : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _filteredFaqItems.length,
-              itemBuilder: (context, index) {
-                return _buildFaqCard(_filteredFaqItems[index]);
-              },
-            ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _filteredFaqItems.length,
+                    itemBuilder: (context, index) {
+                      return _buildFaqCard(_filteredFaqItems[index]);
+                    },
+                  ),
           ),
 
           // Contact Support Button Card
@@ -178,7 +190,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                     'Need more help?',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w300,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -199,15 +211,16 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const ContactUsPage()),
+                            MaterialPageRoute(
+                                builder: (context) => const ContactUsPage()),
                           );
                         },
                         label: const Text(
                           'CONTACT SUPPORT',
                           style: TextStyle(
-                            fontFamily: 'Avenir',
+                            fontFamily: 'BarlowCondensed',
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w300,
                           ),
                         ),
                         backgroundColor: Colors.grey[300],
@@ -215,7 +228,8 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(5),
                         ),
-                        extendedPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        extendedPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 16),
                         isExtended: true,
                       ),
                     ),
@@ -256,7 +270,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
             item.question,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w200,
             ),
           ),
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -285,4 +299,3 @@ class FAQItem {
 
   FAQItem({required this.question, required this.answer});
 }
-

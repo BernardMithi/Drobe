@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:drobe/models/item.dart';
@@ -6,6 +7,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:path_provider/path_provider.dart';
 import 'package:drobe/auth/authService.dart';
+import 'package:drobe/utils/category_utils.dart';
 
 class ItemSelectionPage extends StatefulWidget {
   final String? slot;
@@ -58,7 +60,8 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
         print('Error: Unable to get current user ID');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error: Unable to get user information')),
+            const SnackBar(
+                content: Text('Error: Unable to get user information')),
           );
         }
       }
@@ -152,8 +155,10 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
   // IMPROVED: Check if an item's colors match the color palette with better thresholds
   bool _itemMatchesColorPalette(Item item) {
     // If no color palette is provided or item has no colors, return true
-    if (widget.colorPalette == null || widget.colorPalette!.isEmpty ||
-        item.colors == null || item.colors!.isEmpty) {
+    if (widget.colorPalette == null ||
+        widget.colorPalette!.isEmpty ||
+        item.colors == null ||
+        item.colors!.isEmpty) {
       return true;
     }
 
@@ -220,10 +225,9 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
     // Also check RGB values are all high and close to each other
     final int avgRgb = (color.red + color.green + color.blue) ~/ 3;
     final bool isHighBrightness = avgRgb > 220;
-    final bool isBalanced =
-        (color.red - avgRgb).abs() < 15 &&
-            (color.green - avgRgb).abs() < 15 &&
-            (color.blue - avgRgb).abs() < 15;
+    final bool isBalanced = (color.red - avgRgb).abs() < 15 &&
+        (color.green - avgRgb).abs() < 15 &&
+        (color.blue - avgRgb).abs() < 15;
 
     return isLowSaturation && isHighValue && isHighBrightness && isBalanced;
   }
@@ -246,36 +250,7 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
         return matchesSearch;
       }
 
-      // Handle category mapping for singular/plural mismatches
-      String slotToMatch = widget.slot!.toLowerCase();
-      String itemCategory = item.category.toLowerCase();
-
-      bool matchesSlot = false;
-
-      // For Layer/Layers
-      if (slotToMatch == "layer" && itemCategory == "layers") {
-        matchesSlot = true;
-      }
-      // For Shirt/Shirts
-      else if (slotToMatch == "shirt" && itemCategory == "shirts") {
-        matchesSlot = true;
-      }
-      // For Bottoms/Bottom
-      else if (slotToMatch == "bottoms" && itemCategory == "bottom") {
-        matchesSlot = true;
-      }
-      // For Shoes/Shoe
-      else if (slotToMatch == "shoes" && itemCategory == "shoe") {
-        matchesSlot = true;
-      }
-      // For Accessories/Accessory
-      else if (slotToMatch == "accessories" && itemCategory == "accessory") {
-        matchesSlot = true;
-      }
-      // Default exact match comparison
-      else {
-        matchesSlot = itemCategory == slotToMatch;
-      }
+      final bool matchesSlot = categoriesMatch(widget.slot!, item.category);
 
       // Only show items matching the search query
       final bool matchesSearch = _searchText.isEmpty ||
@@ -283,24 +258,30 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
           item.description.toLowerCase().contains(_searchText.toLowerCase());
 
       // Check if we need to filter by color palette
-      final bool matchesColorPalette = !_filterByColorPalette || _itemMatchesColorPalette(item);
+      final bool matchesColorPalette =
+          !_filterByColorPalette || _itemMatchesColorPalette(item);
 
       return matchesSlot && matchesSearch && matchesColorPalette;
     }).toList();
 
     // If color palette filtering is enabled, sort items by color similarity
-    if (_filterByColorPalette && widget.colorPalette != null && widget.colorPalette!.isNotEmpty) {
+    if (_filterByColorPalette &&
+        widget.colorPalette != null &&
+        widget.colorPalette!.isNotEmpty) {
       items.sort((a, b) {
         // If one item has colors and the other doesn't, prioritize the one with colors
-        if ((a.colors == null || a.colors!.isEmpty) && (b.colors != null && b.colors!.isNotEmpty)) {
+        if ((a.colors == null || a.colors!.isEmpty) &&
+            (b.colors != null && b.colors!.isNotEmpty)) {
           return 1;
         }
-        if ((a.colors != null && a.colors!.isNotEmpty) && (b.colors == null || b.colors!.isEmpty)) {
+        if ((a.colors != null && a.colors!.isNotEmpty) &&
+            (b.colors == null || b.colors!.isEmpty)) {
           return -1;
         }
 
         // If neither has colors, maintain original order
-        if ((a.colors == null || a.colors!.isEmpty) && (b.colors == null || b.colors!.isEmpty)) {
+        if ((a.colors == null || a.colors!.isEmpty) &&
+            (b.colors == null || b.colors!.isEmpty)) {
           return 0;
         }
 
@@ -371,18 +352,38 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show loading indicator while the box is being loaded
+    const Color ink = Color(0xFF1C1A18);
+    const Color mutedInk = Color(0xFF8A847D);
+    const Color line = Color(0xFFEAE6E0);
+    const Color surface = Colors.white;
+    const Color accent = Color(0xFF8B6C52);
+
+    const Map<String, String> slotTitles = {
+      'SHIRT': 'SHIRTS',
+      'LAYER': 'LAYERS',
+      'BOTTOMS': 'BOTTOMS',
+      'SHOES': 'SHOES',
+      'ACCESSORIES': 'ACCESSORIES',
+      'Accessories': 'ACCESSORIES',
+    };
+    final String displayTitle = slotTitles[widget.slot] ??
+        (widget.slot ?? '').toUpperCase();
+
     if (_isLoading) {
       return Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: Text((widget.slot ?? "").toUpperCase() + " ITEMS"),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (Navigator.of(context).canPop()) {
-                Navigator.pop(context);
-              }
-            },
+          backgroundColor: Colors.white,
+          foregroundColor: ink,
+          elevation: 0,
+          centerTitle: true,
+          title: Text(
+            displayTitle,
+            style: const TextStyle(
+              fontFamily: 'BarlowCondensed',
+              fontSize: 22,
+              fontWeight: FontWeight.w300,
+            ),
           ),
         ),
         body: const Center(child: CircularProgressIndicator()),
@@ -390,240 +391,279 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
     }
 
     final items = filteredItems;
-    final bool hasPalette = widget.colorPalette != null && widget.colorPalette!.isNotEmpty;
+    final bool hasPalette =
+        widget.colorPalette != null && widget.colorPalette!.isNotEmpty;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(
-          (widget.slot ?? "").toUpperCase() + " ITEMS",
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
+        backgroundColor: Colors.white,
+        foregroundColor: ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(CupertinoIcons.back, size: 22),
           onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.pop(context);
-            }
+            if (Navigator.of(context).canPop()) Navigator.pop(context);
           },
+        ),
+        title: Text(
+          displayTitle,
+          style: const TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 22,
+            fontWeight: FontWeight.w300,
+            letterSpacing: 0.2,
+          ),
         ),
       ),
       body: Column(
         children: [
-          // Search field
           Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search items',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
-              ),
-            ),
-          ),
-
-          // Color palette filter controls - centered and compact
-          if (hasPalette)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Color palette display (more compact)
-                  Container(
-                    height: 24,
-                    width: MediaQuery.of(context).size.width * 0.8, // 80% of screen width
-                    margin: const EdgeInsets.only(bottom: 8.0),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.black12),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Column(
+              children: [
+                // Search
+                TextField(
+                  controller: _searchController,
+                  style: const TextStyle(
+                    fontFamily: 'BarlowCondensed',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w300,
+                    color: ink,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search items',
+                    hintStyle: const TextStyle(
+                      fontFamily: 'BarlowCondensed',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w300,
+                      color: mutedInk,
                     ),
+                    prefixIcon: const Icon(CupertinoIcons.search, size: 18, color: mutedInk),
+                    filled: true,
+                    fillColor: surface,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: line),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: line),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: mutedInk),
+                    ),
+                    suffixIcon: _searchText.isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: _searchController.clear,
+                            icon: const Icon(CupertinoIcons.xmark_circle_fill,
+                                size: 16, color: mutedInk),
+                          ),
+                  ),
+                ),
+
+                // Palette bar + toggle
+                if (hasPalette) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 22,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFEAE6E0)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: widget.colorPalette!.map((color) {
                         return Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: color,
-                              border: Border.all(color: Colors.black12, width: 0.5),
-                            ),
-                          ),
+                          child: Container(color: color),
                         );
                       }).toList(),
                     ),
                   ),
-
-                  // Compact filter toggle with label
+                  const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        "Filter by palette",
+                        'Filter by palette',
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          fontFamily: 'BarlowCondensed',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w300,
+                          color: mutedInk,
                         ),
                       ),
                       Transform.scale(
-                        scale: 0.8, // Make switch smaller
+                        scale: 0.78,
                         child: Switch(
                           value: _filterByColorPalette,
-                          onChanged: (value) {
-                            setState(() {
-                              _filterByColorPalette = value;
-                            });
-                          },
+                          activeColor: ink,
+                          onChanged: (v) => setState(() => _filterByColorPalette = v),
                         ),
                       ),
                     ],
                   ),
                 ],
-              ),
+                const SizedBox(height: 8),
+              ],
             ),
-
-          // Filter status indicator
-          if (hasPalette && _filterByColorPalette)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Text(
-                "Showing ${items.length} matching items",
-                style: TextStyle(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ),
+          ),
 
           // Items grid
           Expanded(
             child: items.isEmpty
                 ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 16),
-                  Text(
-                    'NO MATCHING ITEMS FOUND',
-                    style: TextStyle(fontSize: 15, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            )
-                : GridView.builder(
-              padding: const EdgeInsets.all(8.0),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.75,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return GestureDetector(
-                  onTap: () {
-                    if (item.inLaundry && widget.fromCreateOutfit) {
-                      // Show warning dialog for items in laundry
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Item in Laundry'),
-                          content: Text(
-                            'This ${item.name} is currently in laundry. Remember to do laundry before the day you plan to wear it!',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context); // Close dialog
-                                if (Navigator.of(context).canPop()) {
-                                  Navigator.pop(context, {'item': item}); // Return the item anyway
-                                }
-                              },
-                              child: const Text('Use Anyway'),
-                            ),
-                          ],
-                        ),
-                      );
-                    } else {
-                      // Item is clean or not for an outfit, return it directly
-                      if (Navigator.of(context).canPop()) {
-                        Navigator.pop(context, {'item': item});
-                      }
-                    }
-                  },
-                  child: Card(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                    child: Text(
+                      'NO MATCHING ITEMS',
+                      style: TextStyle(
+                        fontFamily: 'BarlowCondensed',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w300,
+                        color: mutedInk,
+                        letterSpacing: 1.4,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(10),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    physics: const BouncingScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.72,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return GestureDetector(
+                        onTap: () {
+                          if (item.inLaundry && widget.fromCreateOutfit) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: surface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                title: const Text(
+                                  'Item in Laundry',
+                                  style: TextStyle(
+                                    fontFamily: 'BarlowCondensed',
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w300,
+                                    color: ink,
+                                  ),
+                                ),
+                                content: Text(
+                                  '${item.name} is currently in laundry.',
+                                  style: const TextStyle(color: mutedInk),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel',
+                                        style: TextStyle(color: mutedInk)),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      if (Navigator.of(context).canPop()) {
+                                        Navigator.pop(context, {'item': item});
+                                      }
+                                    },
+                                    child: const Text('Use Anyway',
+                                        style: TextStyle(color: ink)),
+                                  ),
+                                ],
                               ),
-                              color: Colors.grey[200],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(10),
+                            );
+                          } else {
+                            if (Navigator.of(context).canPop()) {
+                              Navigator.pop(context, {'item': item});
+                            }
+                          }
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: surface,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: line),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                              child: item.imageUrl.isNotEmpty
-                                  ? _buildImage(item.imageUrl)
-                                  : const Icon(Icons.image, size: 50, color: Colors.grey),
-                            ),
+                            ],
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                item.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(17),
+                                  ),
+                                  child: Container(
+                                    width: double.infinity,
+                                    color: const Color(0xFFF5F5F5),
+                                    child: item.imageUrl.isNotEmpty
+                                        ? _buildImage(item.imageUrl)
+                                        : const Center(
+                                            child: Icon(CupertinoIcons.photo,
+                                                size: 36, color: mutedInk),
+                                          ),
+                                  ),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.inLaundry ? "In Laundry" : "Clean",
-                                style: TextStyle(
-                                  // Red for laundry, blue for clean
-                                  color: item.inLaundry ? Colors.red : Colors.blue,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.name,
+                                      style: const TextStyle(
+                                        fontFamily: 'BarlowCondensed',
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w300,
+                                        color: ink,
+                                        height: 1,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      item.inLaundry ? 'In Laundry' : 'Clean',
+                                      style: TextStyle(
+                                        fontFamily: 'BarlowCondensed',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w300,
+                                        color: item.inLaundry
+                                            ? const Color(0xFFB04040)
+                                            : accent,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
     );
   }
 }
-

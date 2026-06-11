@@ -47,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const Homepage()),
-                (route) => false, // Remove all previous routes
+            (route) => false, // Remove all previous routes
           );
         }
       } else {
@@ -55,7 +55,8 @@ class _LoginPageState extends State<LoginPage> {
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _errorMessage = result['message'] ?? 'Login failed. Please try again.';
+            _errorMessage =
+                result['message'] ?? 'Login failed. Please try again.';
           });
         }
       }
@@ -72,8 +73,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-      ),
+      appBar: AppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -120,7 +120,9 @@ class _LoginPageState extends State<LoginPage> {
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -171,18 +173,17 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
                     : const Text('LOG IN'),
               ),
               const SizedBox(height: 16),
-
-
 
               // Signup link
               Row(
@@ -204,4 +205,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

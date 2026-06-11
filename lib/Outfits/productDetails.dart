@@ -3,8 +3,7 @@ import 'itemSelection.dart';
 import 'createOutfit.dart';
 import 'package:drobe/models/item.dart';
 import 'package:drobe/models/outfit.dart';
-
-
+import 'package:drobe/theme/drobe_bottom_action.dart';
 
 class ProductDetailsPage extends StatelessWidget {
   final String imageUrl;
@@ -32,7 +31,8 @@ class ProductDetailsPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PRODUCT DETAILS', style: TextStyle(fontFamily: 'Avenir')),
+        title: const Text('PRODUCT DETAILS',
+            style: TextStyle(fontFamily: 'BarlowCondensed')),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -63,22 +63,22 @@ class ProductDetailsPage extends StatelessWidget {
                 ),
                 child: imageUrl.isNotEmpty
                     ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                  ),
-                )
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                        ),
+                      )
                     : const Icon(Icons.image, size: 100, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               Text(
                 productName,
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  fontFamily: 'Avenir',
+                  fontWeight: FontWeight.w200,
+                  fontSize: 24,
+                  fontFamily: 'BarlowCondensed',
                 ),
               ),
               const SizedBox(height: 8),
@@ -87,7 +87,7 @@ class ProductDetailsPage extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey,
-                  fontFamily: 'Avenir',
+                  fontFamily: 'BarlowCondensed',
                 ),
               ),
               const SizedBox(height: 16),
@@ -96,7 +96,7 @@ class ProductDetailsPage extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 16,
                   color: Colors.black87,
-                  fontFamily: 'Avenir',
+                  fontFamily: 'BarlowCondensed',
                 ),
               ),
             ],
@@ -134,7 +134,7 @@ class ProductDetailsPage extends StatelessWidget {
         shape: const CircleBorder(),
         child: const Icon(Icons.check, color: Colors.white),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButtonLocation: const DrobeBottomFabLocation.end(),
     );
   }
 }

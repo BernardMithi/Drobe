@@ -10,7 +10,7 @@ class NotificationService {
   NotificationService._internal();
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
 
   static const String outfitChannelId = 'outfit_reminders';
   static const String laundryChannelId = 'laundry_reminders';
@@ -38,28 +38,32 @@ class NotificationService {
 
       // Create notification channels with sound and vibration
       const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/launcher_icon');
+          AndroidInitializationSettings('@mipmap/launcher_icon');
 
       // Updated iOS initialization settings - removed onDidReceiveLocalNotification
       final DarwinInitializationSettings initializationSettingsIOS =
-      DarwinInitializationSettings(
+          DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
       );
 
-      final InitializationSettings initializationSettings = InitializationSettings(
+      final InitializationSettings initializationSettings =
+          InitializationSettings(
         android: initializationSettingsAndroid,
         iOS: initializationSettingsIOS,
       );
 
       final bool success = await flutterLocalNotificationsPlugin.initialize(
-        initializationSettings,
-        onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
-          // Handle notification tap
-          debugPrint('Notification tapped: ${notificationResponse.payload}');
-        },
-      ) ?? false;
+            initializationSettings,
+            onDidReceiveNotificationResponse:
+                (NotificationResponse notificationResponse) async {
+              // Handle notification tap
+              debugPrint(
+                  'Notification tapped: ${notificationResponse.payload}');
+            },
+          ) ??
+          false;
 
       if (!success) {
         debugPrint('Failed to initialize NotificationService');
@@ -86,8 +90,9 @@ class NotificationService {
   Future<void> _requestPermissions() async {
     try {
       // Request iOS permissions
-      final iOS = flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+      final iOS =
+          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
 
       if (iOS != null) {
         await iOS.requestPermissions(
@@ -101,7 +106,8 @@ class NotificationService {
 
       // For Android, permissions are requested during initialization
       // or through the app settings on newer Android versions
-      debugPrint('Android notification permissions are handled through app settings');
+      debugPrint(
+          'Android notification permissions are handled through app settings');
     } catch (e) {
       debugPrint('Error requesting notification permissions: $e');
     }
@@ -110,7 +116,8 @@ class NotificationService {
   // Add a method to create notification channels for Android
   Future<void> _createNotificationChannels() async {
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-    flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidPlugin != null) {
       // Create outfit reminders channel
@@ -184,7 +191,8 @@ class NotificationService {
       debugPrint('Scheduling outfit reminder for: ${scheduledDate.toString()}');
 
       // Configure notification details
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
         outfitChannelId,
         'Outfit Reminders',
         channelDescription: 'Daily reminders to plan your outfit',
@@ -214,11 +222,13 @@ class NotificationService {
         scheduledDate,
         platformDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time, // Repeat daily at the same time
+        matchDateTimeComponents:
+            DateTimeComponents.time, // Repeat daily at the same time
         payload: 'outfit_reminder',
       );
 
-      debugPrint('Outfit reminder scheduled for $time (${scheduledDate.toString()})');
+      debugPrint(
+          'Outfit reminder scheduled for $time (${scheduledDate.toString()})');
       return true;
     } catch (e) {
       debugPrint('Error scheduling outfit reminder: $e');
@@ -270,7 +280,8 @@ class NotificationService {
         daysUntilTarget += 7;
       } else if (daysUntilTarget == 0) {
         // Same day, check if time has passed
-        final targetTime = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+        final targetTime =
+            tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
         if (targetTime.isBefore(now)) {
           daysUntilTarget = 7; // Schedule for next week
         }
@@ -285,10 +296,12 @@ class NotificationService {
         minute,
       );
 
-      debugPrint('Scheduling laundry reminder for: ${scheduledDate.toString()} (${day} at ${time})');
+      debugPrint(
+          'Scheduling laundry reminder for: ${scheduledDate.toString()} (${day} at ${time})');
 
       // Configure notification details
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
         laundryChannelId,
         'Laundry Reminders',
         channelDescription: 'Weekly reminders to do your laundry',
@@ -318,11 +331,13 @@ class NotificationService {
         scheduledDate,
         platformDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime, // Repeat weekly on the same day and time
+        matchDateTimeComponents: DateTimeComponents
+            .dayOfWeekAndTime, // Repeat weekly on the same day and time
         payload: 'laundry_reminder',
       );
 
-      debugPrint('Laundry reminder scheduled for $day at $time (${scheduledDate.toString()})');
+      debugPrint(
+          'Laundry reminder scheduled for $day at $time (${scheduledDate.toString()})');
       return true;
     } catch (e) {
       debugPrint('Error scheduling laundry reminder: $e');
@@ -372,4 +387,3 @@ class NotificationService {
     }
   }
 }
-

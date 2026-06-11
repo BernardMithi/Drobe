@@ -90,7 +90,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         // Password reset successful
         setState(() {
           _isLoading = false;
-          _successMessage = 'Password reset successful! You can now log in with your new password.';
+          _successMessage =
+              'Password reset successful! You can now log in with your new password.';
         });
 
         // Navigate back to login after a short delay
@@ -159,7 +160,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                        .hasMatch(value)) {
                       return 'Please enter a valid email';
                     }
                     return null;
@@ -175,13 +177,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   ),
                   child: _isLoading
                       ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
                       : const Text('CONTINUE'),
                 ),
               ],
@@ -204,7 +207,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                       ),
                       onPressed: () {
                         setState(() {
@@ -235,7 +240,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                        _obscureConfirmPassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                       ),
                       onPressed: () {
                         setState(() {
@@ -264,13 +271,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   ),
                   child: _isLoading
                       ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
                       : const Text('RESET PASSWORD'),
                 ),
               ],
@@ -319,4 +327,3 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     );
   }
 }
-

@@ -1,13 +1,10 @@
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:drobe/models/item.dart';
 import 'package:drobe/models/outfit.dart';
 import 'package:drobe/models/lookbookItem.dart';
 import 'package:drobe/auth/authService.dart';
 import 'dart:async';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 
 class HiveManager {
   // Singleton pattern
@@ -39,8 +36,8 @@ class HiveManager {
       debugPrint('HiveManager initialized successfully');
     } catch (e) {
       debugPrint('Error initializing HiveManager: $e');
-      // Don't rethrow, just log the error and continue
-      _isInitialized = true; // Mark as initialized anyway to prevent further attempts
+      _isInitialized = false;
+      rethrow;
     }
   }
 
@@ -51,12 +48,11 @@ class HiveManager {
       await Future.wait([
         _doInitialize(),
       ]).timeout(const Duration(seconds: 10), onTimeout: () {
-        debugPrint('HiveManager initialization timed out, continuing anyway');
-        return [null];
+        throw TimeoutException('HiveManager initialization timed out');
       });
     } catch (e) {
       debugPrint('Error in _initializeWithTimeout: $e');
-      // Continue anyway
+      rethrow;
     }
   }
 
@@ -128,7 +124,6 @@ class HiveManager {
       final box = await Hive.openBox(boxName).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          debugPrint('Opening box $boxName timed out, creating empty box');
           throw TimeoutException('Box opening timed out');
         },
       );
@@ -138,22 +133,7 @@ class HiveManager {
       return box;
     } catch (e) {
       debugPrint('Error opening box $boxName: $e');
-
-      try {
-        // Try to recover by deleting the box and reopening it
-        await Hive.deleteBoxFromDisk(boxName);
-        final box = await Hive.openBox(boxName);
-        _boxes[boxName] = box;
-        debugPrint('Recovered box: $boxName');
-        return box;
-      } catch (recoveryError) {
-        debugPrint('Failed to recover box $boxName: $recoveryError');
-        // If recovery fails, create an empty box as a last resort
-        final box = await Hive.openBox('temp_$boxName');
-        _boxes[boxName] = box;
-        debugPrint('Created temporary box for: $boxName');
-        return box;
-      }
+      throw StateError('Unable to open persistent box "$boxName": $e');
     }
   }
 
@@ -185,38 +165,28 @@ class HiveManager {
       debugPrint('Cleared box: $boxName');
     } catch (e) {
       debugPrint('Error clearing box $boxName: $e');
-      // Try to delete and recreate the box if clearing fails
-      try {
-        await Hive.deleteBoxFromDisk(boxName);
-        await getBox(boxName); // This will create a new empty box
-        debugPrint('Deleted and recreated box: $boxName');
-      } catch (deleteError) {
-        debugPrint('Error deleting box $boxName: $deleteError');
-        // Continue anyway
-      }
+      rethrow;
     }
   }
 
-  // IMPROVED: Clear all boxes with more robust implementation
+  // Clear selected app boxes. This is intentionally explicit and never deletes
+  // all Hive data as a fallback, because that can wipe accounts/content.
   Future<void> clearAllData({bool clearUserAuth = false}) async {
     debugPrint('Starting clearAllData operation...');
 
     try {
-      // Close all open boxes first
-      await closeAllBoxes();
-
       // List of all box names used in the app
       final List<String> boxNames = [
         'itemsBox',
         'outfitsBox',
-        'lookbookItemsBox',
+        'lookbookItems',
         'laundryItemsBox',
         'userPreferencesBox',
       ];
 
       // Add auth box if requested
       if (clearUserAuth) {
-        boxNames.add('usersBox');
+        boxNames.add(AuthService.USERS_BOX_NAME);
         boxNames.add('authBox'); // Add any other auth-related boxes
       }
 
@@ -232,43 +202,6 @@ class HiveManager {
           // Continue with other boxes
         }
       }
-
-      // Method 2: As a fallback, try to delete all Hive data
-      try {
-        debugPrint('Attempting to delete all Hive data from disk...');
-        await Hive.deleteFromDisk();
-        debugPrint('Successfully deleted all Hive data from disk');
-
-        // Reinitialize Hive after deleting everything
-        await Hive.initFlutter();
-        _registerAdapters();
-        _isInitialized = false; // Force reinitialization on next use
-
-      } catch (e) {
-        debugPrint('Error deleting all Hive data: $e');
-
-        // Method 3: Last resort - manually delete Hive directory
-        try {
-          final directory = await getApplicationDocumentsDirectory();
-          final hivePath = '${directory.path}/hive';
-          final hiveDir = Directory(hivePath);
-
-          if (await hiveDir.exists()) {
-            debugPrint('Manually deleting Hive directory: $hivePath');
-            await hiveDir.delete(recursive: true);
-            debugPrint('Successfully deleted Hive directory');
-
-            // Reinitialize Hive after manual deletion
-            await Hive.initFlutter();
-            _registerAdapters();
-          }
-        } catch (dirError) {
-          debugPrint('Error manually deleting Hive directory: $dirError');
-        }
-      }
-
-      // Clear our internal box cache
-      _boxes.clear();
 
       debugPrint('clearAllData operation completed');
     } catch (e) {
@@ -310,8 +243,9 @@ class HiveManager {
       // Get the current user ID
       final currentUserId = await ensureUserIdAvailable();
 
-      if (currentUserId == null || currentUserId!.isEmpty) {
-        debugPrint('Warning: No current user ID available, returning empty item list');
+      if (currentUserId == null || currentUserId.isEmpty) {
+        debugPrint(
+            'Warning: No current user ID available, returning empty item list');
         return [];
       }
 
@@ -320,17 +254,17 @@ class HiveManager {
       debugPrint('Found ${allItems.length} total items in box');
 
       // Filter by user ID - ONLY include items that explicitly match the current user ID
-      var items = allItems.where((item) =>
-      item.userId == currentUserId
-      ).toList();
+      var items =
+          allItems.where((item) => item.userId == currentUserId).toList();
 
       debugPrint('Found ${items.length} items for user $currentUserId');
 
       // Filter by category if provided
       if (category != null && category.isNotEmpty) {
-        items = items.where((item) =>
-        item.category.toLowerCase() == category.toLowerCase()
-        ).toList();
+        items = items
+            .where(
+                (item) => item.category.toLowerCase() == category.toLowerCase())
+            .toList();
 
         debugPrint('Found ${items.length} items in category $category');
       }
@@ -367,7 +301,8 @@ class HiveManager {
       // Save the item
       await box.add(itemWithUserId);
 
-      debugPrint('Saved item with ID: ${itemWithUserId.id}, Name: ${itemWithUserId.name}, User: $currentUserId');
+      debugPrint(
+          'Saved item with ID: ${itemWithUserId.id}, Name: ${itemWithUserId.name}, User: $currentUserId');
     } catch (e) {
       debugPrint('Error saving item: $e');
       rethrow;
@@ -409,7 +344,8 @@ class HiveManager {
 
   // Enhanced updateItem method with robust error handling and logging
   // Renamed to updateItemWithFields to avoid conflict
-  Future<bool> updateItemWithFields(String boxName, String itemId, Map<String, dynamic> updates) async {
+  Future<bool> updateItemWithFields(
+      String boxName, String itemId, Map<String, dynamic> updates) async {
     try {
       debugPrint('HiveServiceManager: Updating item with ID: $itemId');
       debugPrint('HiveServiceManager: Updates: $updates');
@@ -430,7 +366,8 @@ class HiveManager {
       }
 
       if (foundItem == null) {
-        debugPrint('HiveServiceManager: ERROR - Item with ID $itemId not found in box $boxName');
+        debugPrint(
+            'HiveServiceManager: ERROR - Item with ID $itemId not found in box $boxName');
         return false;
       }
 
@@ -483,7 +420,7 @@ class HiveManager {
       dynamic key;
       try {
         key = box.keys.firstWhere(
-              (k) {
+          (k) {
             final value = box.get(k);
             return value is Item && value.id == itemId;
           },
@@ -497,7 +434,8 @@ class HiveManager {
       if (key != null) {
         // Verify the item belongs to the current user
         final existingItem = box.get(key) as Item;
-        if (existingItem.userId != null && existingItem.userId != currentUserId) {
+        if (existingItem.userId != null &&
+            existingItem.userId != currentUserId) {
           throw Exception('Cannot delete item: It belongs to another user');
         }
 
@@ -516,4 +454,3 @@ class HiveManager {
     await Hive.initFlutter();
   }
 }
-

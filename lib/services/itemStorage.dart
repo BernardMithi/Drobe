@@ -4,6 +4,7 @@ import '../models/item.dart';
 import 'package:uuid/uuid.dart';
 import 'hiveServiceManager.dart';
 import 'package:drobe/auth/authService.dart';
+import 'package:drobe/utils/category_utils.dart';
 
 class ItemStorageService {
   static const String itemsBoxName = 'itemsBox';
@@ -75,7 +76,10 @@ class ItemStorageService {
           final item = box.get(key);
           if (item is Item && (item.userId == null || item.userId!.isEmpty)) {
             // Create a copy with the user ID
-            final updatedItem = item.copyWith(userId: currentUserId);
+            final updatedItem = item.copyWith(
+              userId: currentUserId,
+              category: wardrobeCategoryKey(item.category),
+            );
 
             // Save the updated item
             await box.put(key, updatedItem);
@@ -123,12 +127,16 @@ class ItemStorageService {
       }
 
       // Always set the userId to the current user
-      item = item.copyWith(userId: currentUserId);
+      item = item.copyWith(
+        userId: currentUserId,
+        category: wardrobeCategoryKey(item.category),
+      );
       debugPrint('Set userId $currentUserId for item ${item.id}');
 
       // Save the item
       await box.put(item.id, item);
-      debugPrint('Saved item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
+      debugPrint(
+          'Saved item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
 
       return item;
     } catch (e) {
@@ -155,17 +163,20 @@ class ItemStorageService {
       final currentUserId = userData['id'];
 
       if (currentUserId == null || currentUserId.isEmpty) {
-        debugPrint('Warning: No current user ID available, returning empty item list');
+        debugPrint(
+            'Warning: No current user ID available, returning empty item list');
         return [];
       }
 
-      debugPrint('Loading items for user: $currentUserId. Total in box: ${box.length}');
+      debugPrint(
+          'Loading items for user: $currentUserId. Total in box: ${box.length}');
 
       // Log all items in the box for debugging
       for (final key in box.keys) {
         final value = box.get(key);
         if (value is Item) {
-          debugPrint('Found item: ID=${value.id}, Name=${value.name}, UserID=${value.userId}');
+          debugPrint(
+              'Found item: ID=${value.id}, Name=${value.name}, UserID=${value.userId}');
         }
       }
 
@@ -185,11 +196,12 @@ class ItemStorageService {
 
       // Filter by category if provided
       if (category != null && category.isNotEmpty) {
-        final filteredItems = items.where((item) =>
-        item.category.toLowerCase() == category.toLowerCase()
-        ).toList();
+        final filteredItems = items
+            .where((item) => categoriesMatch(category, item.category))
+            .toList();
 
-        debugPrint('Loaded ${filteredItems.length} items for user $currentUserId in category $category');
+        debugPrint(
+            'Loaded ${filteredItems.length} items for user $currentUserId in category $category');
         return filteredItems;
       }
 
@@ -241,7 +253,7 @@ class ItemStorageService {
   }
 
   /// Delete an item
-  static Future<void> deleteItem(String id) async {
+  static Future<bool> deleteItem(String id) async {
     try {
       // Make sure we're initialized
       if (!_initialized) {
@@ -249,11 +261,22 @@ class ItemStorageService {
       }
 
       final box = await HiveManager().getBox(itemsBoxName);
-      final item = box.get(id) as Item?;
+      dynamic itemKey = id;
+      Item? item = box.get(id) as Item?;
+
+      if (item == null) {
+        itemKey = box.keys.cast<dynamic>().firstWhere(
+              (key) => box.get(key) is Item && (box.get(key) as Item).id == id,
+              orElse: () => null,
+            );
+        if (itemKey != null) {
+          item = box.get(itemKey) as Item?;
+        }
+      }
 
       if (item == null) {
         debugPrint('Item with ID $id not found');
-        return;
+        return false;
       }
 
       // Get the current user ID
@@ -264,18 +287,21 @@ class ItemStorageService {
 
       if (currentUserId == null || currentUserId.isEmpty) {
         debugPrint('Cannot delete item: No current user ID available');
-        return;
+        return false;
       }
 
       // Only delete the item if it belongs to the current user
       if (item.userId == currentUserId) {
-        await box.delete(id);
+        await box.delete(itemKey);
         debugPrint('Deleted item with ID: $id');
+        return true;
       } else {
         debugPrint('Cannot delete item: It belongs to another user');
+        return false;
       }
     } catch (e) {
       debugPrint('Error deleting item with ID $id: $e');
+      return false;
     }
   }
 
@@ -289,7 +315,8 @@ class ItemStorageService {
 
       // Validate the item ID
       if (item.id.isEmpty) {
-        debugPrint('ERROR: No ID found for item "${item.name}" - cannot update');
+        debugPrint(
+            'ERROR: No ID found for item "${item.name}" - cannot update');
         throw Exception('Cannot update item without an ID');
       }
 
@@ -310,9 +337,13 @@ class ItemStorageService {
       final existingItem = box.get(item.id) as Item?;
 
       if (existingItem == null) {
-        debugPrint('WARNING: Item with ID ${item.id} not found in box. Creating new entry.');
+        debugPrint(
+            'WARNING: Item with ID ${item.id} not found in box. Creating new entry.');
         // This is a new item, so set the userId
-        item = item.copyWith(userId: currentUserId);
+        item = item.copyWith(
+          userId: currentUserId,
+          category: wardrobeCategoryKey(item.category),
+        );
       } else {
         // Verify the item belongs to the current user
         if (existingItem.userId != currentUserId) {
@@ -321,12 +352,16 @@ class ItemStorageService {
         }
 
         // Preserve the userId
-        item = item.copyWith(userId: currentUserId);
+        item = item.copyWith(
+          userId: currentUserId,
+          category: wardrobeCategoryKey(item.category),
+        );
       }
 
       // Put the updated item with the same ID
       await box.put(item.id, item);
-      debugPrint('Successfully updated item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
+      debugPrint(
+          'Successfully updated item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
 
       return item;
     } catch (e) {
@@ -335,4 +370,3 @@ class ItemStorageService {
     }
   }
 }
-

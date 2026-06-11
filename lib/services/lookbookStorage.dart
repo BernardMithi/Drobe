@@ -62,7 +62,8 @@ class LookbookStorageService {
       final currentUserId = userData['id'];
 
       if (currentUserId == null || currentUserId.isEmpty) {
-        debugPrint('Cannot migrate lookbook items: No current user ID available');
+        debugPrint(
+            'Cannot migrate lookbook items: No current user ID available');
         return;
       }
 
@@ -71,7 +72,8 @@ class LookbookStorageService {
 
       for (final key in box.keys) {
         final item = box.get(key);
-        if (item is LookbookItem && (item.userId == null || item.userId!.isEmpty)) {
+        if (item is LookbookItem &&
+            (item.userId == null || item.userId!.isEmpty)) {
           itemsToMigrate[key.toString()] = item;
         }
       }
@@ -118,7 +120,8 @@ class LookbookStorageService {
       final currentUserId = userData['id'];
 
       if (currentUserId == null || currentUserId.isEmpty) {
-        debugPrint('Warning: No current user ID available when saving lookbook item');
+        debugPrint(
+            'Warning: No current user ID available when saving lookbook item');
       } else {
         // Always set the userId to the current user
         item = item.copyWith(userId: currentUserId);
@@ -127,7 +130,8 @@ class LookbookStorageService {
 
       // Verify the ID is set before saving
       if (item.id == null || item.id!.isEmpty) {
-        debugPrint('ERROR: Lookbook item ID is still null or empty after generation attempt!');
+        debugPrint(
+            'ERROR: Lookbook item ID is still null or empty after generation attempt!');
         throw Exception('Failed to generate a valid ID for lookbook item');
       }
 
@@ -138,11 +142,13 @@ class LookbookStorageService {
       final savedItem = box.get(item.id) as LookbookItem?;
 
       if (savedItem == null) {
-        debugPrint('ERROR: Failed to retrieve saved lookbook item with ID: ${item.id}');
+        debugPrint(
+            'ERROR: Failed to retrieve saved lookbook item with ID: ${item.id}');
         throw Exception('Failed to save lookbook item: ${item.name}');
       }
 
-      debugPrint('Successfully saved lookbook item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
+      debugPrint(
+          'Successfully saved lookbook item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
 
       // Return the saved lookbook item with its ID
       return savedItem;
@@ -165,11 +171,13 @@ class LookbookStorageService {
       final currentUserId = userData['id'];
 
       if (currentUserId == null || currentUserId.isEmpty) {
-        debugPrint('Warning: No current user ID available, returning empty lookbook item list');
+        debugPrint(
+            'Warning: No current user ID available, returning empty lookbook item list');
         return [];
       }
 
-      debugPrint('Loading lookbook items for user: $currentUserId. Total in box: ${box.length}');
+      debugPrint(
+          'Loading lookbook items for user: $currentUserId. Total in box: ${box.length}');
 
       for (final key in box.keys) {
         try {
@@ -192,7 +200,8 @@ class LookbookStorageService {
         }
       }
 
-      debugPrint('Loaded ${items.length} lookbook items for user $currentUserId');
+      debugPrint(
+          'Loaded ${items.length} lookbook items for user $currentUserId');
       return items;
     } catch (e) {
       debugPrint('Error getting all lookbook items: $e');
@@ -217,17 +226,21 @@ class LookbookStorageService {
       final currentUserId = userData['id'];
 
       if (currentUserId == null || currentUserId.isEmpty) {
-        debugPrint('Warning: No current user ID available when getting lookbook item');
+        debugPrint(
+            'Warning: No current user ID available when getting lookbook item');
         return null;
       }
 
       // Only return the item if it belongs to the current user or has no userId (legacy item)
-      if (item.userId == null || item.userId!.isEmpty || item.userId == currentUserId) {
+      if (item.userId == null ||
+          item.userId!.isEmpty ||
+          item.userId == currentUserId) {
         // If the item has no userId, assign the current user's ID
         if (item.userId == null || item.userId!.isEmpty) {
           item.userId = currentUserId;
           await box.put(id, item);
-          debugPrint('Assigned userId $currentUserId to lookbook item: ${item.name}');
+          debugPrint(
+              'Assigned userId $currentUserId to lookbook item: ${item.name}');
         }
 
         return item;
@@ -264,7 +277,9 @@ class LookbookStorageService {
       }
 
       // Only delete the item if it belongs to the current user or has no userId (legacy item)
-      if (item.userId == null || item.userId!.isEmpty || item.userId == currentUserId) {
+      if (item.userId == null ||
+          item.userId!.isEmpty ||
+          item.userId == currentUserId) {
         await box.delete(id);
         debugPrint('Deleted lookbook item with ID: $id');
       } else {
@@ -280,7 +295,8 @@ class LookbookStorageService {
     try {
       // Validate the item ID
       if (item.id == null || item.id!.isEmpty) {
-        debugPrint('ERROR: No ID found for lookbook item "${item.name}" - cannot update');
+        debugPrint(
+            'ERROR: No ID found for lookbook item "${item.name}" - cannot update');
         throw Exception('Cannot update lookbook item without an ID');
       }
 
@@ -294,21 +310,26 @@ class LookbookStorageService {
 
       if (currentUserId == null || currentUserId.isEmpty) {
         debugPrint('Cannot update lookbook item: No current user ID available');
-        throw Exception('Cannot update lookbook item: No current user ID available');
+        throw Exception(
+            'Cannot update lookbook item: No current user ID available');
       }
 
       // Check if the item exists before updating
       final existingItem = box.get(item.id) as LookbookItem?;
 
       if (existingItem == null) {
-        debugPrint('WARNING: Lookbook item with ID ${item.id} not found in box. Creating new entry.');
+        debugPrint(
+            'WARNING: Lookbook item with ID ${item.id} not found in box. Creating new entry.');
         // This is a new item, so set the userId
         item = item.copyWith(userId: currentUserId);
       } else {
         // Verify the item belongs to the current user
-        if (existingItem.userId != null && existingItem.userId!.isNotEmpty && existingItem.userId != currentUserId) {
+        if (existingItem.userId != null &&
+            existingItem.userId!.isNotEmpty &&
+            existingItem.userId != currentUserId) {
           debugPrint('Cannot update lookbook item: It belongs to another user');
-          throw Exception('Cannot update lookbook item: It belongs to another user');
+          throw Exception(
+              'Cannot update lookbook item: It belongs to another user');
         }
 
         // Preserve the userId if it exists, otherwise set it
@@ -324,11 +345,13 @@ class LookbookStorageService {
       final updatedItem = box.get(item.id) as LookbookItem?;
 
       if (updatedItem == null) {
-        debugPrint('ERROR: Failed to retrieve updated lookbook item with ID: ${item.id}');
+        debugPrint(
+            'ERROR: Failed to retrieve updated lookbook item with ID: ${item.id}');
         throw Exception('Failed to update lookbook item: ${item.name}');
       }
 
-      debugPrint('Successfully updated lookbook item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
+      debugPrint(
+          'Successfully updated lookbook item with ID: ${item.id}, Name: ${item.name}, User: ${item.userId}');
 
       // Return the updated lookbook item
       return updatedItem;
@@ -342,7 +365,9 @@ class LookbookStorageService {
   static Future<List<LookbookItem>> getItemsByTag(String tag) async {
     try {
       final allItems = await getAllItems();
-      return allItems.where((item) => item.tags.contains(tag.toLowerCase())).toList();
+      return allItems
+          .where((item) => item.tags.contains(tag.toLowerCase()))
+          .toList();
     } catch (e) {
       debugPrint('Error getting lookbook items by tag $tag: $e');
       return [];
@@ -366,4 +391,3 @@ class LookbookStorageService {
     }
   }
 }
-

@@ -11,9 +11,11 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:drobe/services/hiveServiceManager.dart';
 import 'package:drobe/settings/profile.dart';
+import 'package:drobe/settings/profileAvatar.dart';
 import 'package:drobe/auth/authService.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:drobe/theme/drobe_bottom_action.dart';
 
 class CreatePalettePage extends StatefulWidget {
   final DateTime selectedDate;
@@ -31,9 +33,16 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   List<ColorTile> _wardrobeColors = []; // To store all wardrobe colors
   bool _useGreyPalette = false; // Only use grey when needed
   String? _currentUserId;
+  String _currentUserName = '';
+  String _currentUserEmail = '';
   final AuthService _authService = AuthService();
   String _selectedColorScheme = 'custom'; // Default to custom
-  final List<String> _colorSchemes = ['custom', 'monochromatic', 'complementary', 'analogous'];
+  final List<String> _colorSchemes = [
+    'custom',
+    'monochromatic',
+    'complementary',
+    'analogous'
+  ];
   String? _colorTheoryTip;
   Color? _baseTheoryColor;
 
@@ -49,9 +58,10 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   Future<void> _getCurrentUserId() async {
     try {
       final userData = await _authService.getCurrentUser();
-      final userId = userData['id'];
       setState(() {
-        _currentUserId = userId;
+        _currentUserId = userData['id'];
+        _currentUserName = userData['name'] ?? '';
+        _currentUserEmail = userData['email'] ?? '';
       });
       print('Current user ID: $_currentUserId');
       _checkItemsExistence();
@@ -128,13 +138,17 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
           final item = itemsBox.get(key);
           if (item != null && item is Item) {
             // Filter by user ID if available
-            if (_currentUserId != null && item.userId != null && item.userId != _currentUserId) {
-              print('Skipping item ${item.name} - belongs to user ${item.userId}, not $_currentUserId');
+            if (_currentUserId != null &&
+                item.userId != null &&
+                item.userId != _currentUserId) {
+              print(
+                  'Skipping item ${item.name} - belongs to user ${item.userId}, not $_currentUserId');
               continue;
             }
 
             items.add(item);
-            print('Added item: ${item.name}, Has colors: ${item.colors != null}');
+            print(
+                'Added item: ${item.name}, Has colors: ${item.colors != null}');
             if (item.colors != null) {
               print('Colors: ${item.colors}');
             }
@@ -149,7 +163,9 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                   imageUrl: item['imageUrl'] as String? ?? '',
                   name: item['name'] as String? ?? 'Unknown Item',
                   description: item['description'] as String? ?? '',
-                  colors: item['colors'] is List ? List<int>.from(item['colors']) : null,
+                  colors: item['colors'] is List
+                      ? List<int>.from(item['colors'])
+                      : null,
                   category: item['category'] as String? ?? 'uncategorized',
                   wearCount: item['wearCount'] as int? ?? 0,
                   inLaundry: item['inLaundry'] as bool? ?? false,
@@ -157,13 +173,15 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                 );
 
                 // Filter by user ID if available
-                if (_currentUserId != null && convertedItem.userId != null &&
+                if (_currentUserId != null &&
+                    convertedItem.userId != null &&
                     convertedItem.userId != _currentUserId) {
                   continue;
                 }
 
                 items.add(convertedItem);
-                print('Successfully converted map to Item: ${convertedItem.name}');
+                print(
+                    'Successfully converted map to Item: ${convertedItem.name}');
               } catch (e) {
                 print('Failed to convert map to Item: $e');
               }
@@ -206,12 +224,16 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
             // Skip pure red, green, and blue colors (more comprehensive check)
             Color color = Color(colorWithAlpha);
-            bool isPureRed = color.red > 240 && color.green < 30 && color.blue < 30;
-            bool isPureGreen = color.green > 240 && color.red < 30 && color.blue < 30;
-            bool isPureBlue = color.blue > 240 && color.red < 30 && color.green < 30;
+            bool isPureRed =
+                color.red > 240 && color.green < 30 && color.blue < 30;
+            bool isPureGreen =
+                color.green > 240 && color.red < 30 && color.blue < 30;
+            bool isPureBlue =
+                color.blue > 240 && color.red < 30 && color.green < 30;
 
             if (isPureRed || isPureGreen || isPureBlue) {
-              print('Filtered out test color: 0x${colorWithAlpha.toRadixString(16)}');
+              print(
+                  'Filtered out test color: 0x${colorWithAlpha.toRadixString(16)}');
               continue;
             }
 
@@ -219,11 +241,12 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
               try {
                 colorMap[colorWithAlpha] = ColorTile(
                   color: Color(colorWithAlpha),
-
                 );
-                print('Added color: 0x${colorWithAlpha.toRadixString(16)} from ${item.name}');
+                print(
+                    'Added color: 0x${colorWithAlpha.toRadixString(16)} from ${item.name}');
               } catch (e) {
-                print('Error creating color (${colorWithAlpha.toRadixString(16)}): $e');
+                print(
+                    'Error creating color (${colorWithAlpha.toRadixString(16)}): $e');
               }
             }
           }
@@ -240,7 +263,8 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         // Show notification to user after UI is built
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            _showGreyPaletteNotification("Using grayscale palette because no colors were found in your wardrobe items.");
+            _showGreyPaletteNotification(
+                "Using grayscale palette because no colors were found in your wardrobe items.");
           }
         });
       } else {
@@ -260,7 +284,6 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
           _isLoading = false;
         });
       }
-
     } catch (e) {
       print('Error in _loadWardrobeColors: $e');
       if (mounted) {
@@ -274,7 +297,8 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         // Show notification to user after UI is built
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            _showGreyPaletteNotification("Using grayscale palette due to an error loading your wardrobe colors.");
+            _showGreyPaletteNotification(
+                "Using grayscale palette due to an error loading your wardrobe colors.");
           }
         });
       }
@@ -325,8 +349,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
       if (!_palette[i].isLocked) {
         _palette[i] = ColorTile(
             color: _wardrobeColors[i].color,
-            itemName: _wardrobeColors[i].itemName
-        );
+            itemName: _wardrobeColors[i].itemName);
       }
     }
     _colorTheoryTip = _analyzePalette();
@@ -338,277 +361,342 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
     final activePalette = _palette.take(_paletteSize).toList();
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('CREATE AN OUTFIT',style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF242424),
+        elevation: 0,
+        title: const Text(
+          'CREATE AN OUTFIT',
+          style: TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 20,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.account_circle,
-              size: 42,
-              color: Colors.grey[800],
-            ),
-            onPressed: () {
-              Navigator.push(
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => ProfilePage()),
-              );
-            },
+              ),
+              child: ProfileAvatar(
+                size: 38,
+                userId: _currentUserId ?? '',
+                name: _currentUserName,
+                email: _currentUserEmail,
+              ),
+            ),
           ),
         ],
       ),
       body: SafeArea(
+        bottom: false,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            /// **Title Section**
-            const Padding(
-              padding: EdgeInsets.all(25),
-              child: Text(
-                "LETS CHOOSE A COLOUR PALETTE",
-                style: TextStyle(
-                  fontFamily: 'Avenir',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 5),
-
-            /// **Palette Size Selection**
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 25),
-              child: Text(
-                "COLOUR PALETTE SIZE",
-                style: TextStyle(fontFamily: 'Avenir', fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(4, (index) {
-                  final size = index + 1;
-                  final isSelected = (size == _paletteSize);
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() => _paletteSize = size);
-                    },
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        border: isSelected
-                            ? const Border(
-                          bottom: BorderSide(
-                            color: Colors.black,
-                            width: 4,
-                          ),
-                        )
-                            : null,
-                      ),
-                      child: Text(
-                        size.toString(),
-                        style: TextStyle(
-                          fontFamily: 'Avenir',
-                          fontSize: 16,
-                          fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? Colors.black : Colors.grey,
-                        ),
-                      ),
+            : Stack(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      22,
+                      8,
+                      22,
+                      DrobeBottomAction.lowActionContentInset(context),
                     ),
-                  );
-                }),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            /// **Color Theory Selection**
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 25, vertical: 8),
-              child: Text(
-                "COLOR THEORY",
-                style: TextStyle(fontFamily: 'Avenir', fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _colorSchemes.map((scheme) {
-                    final isSelected = (scheme == _selectedColorScheme);
-
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() => _selectedColorScheme = scheme);
-                          if (scheme != 'custom') {
-                            _generateTheoryBasedPalette();
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isSelected ? Colors.black : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        /// **Title Section**
+                        const Text(
+                          "CHOOSE A COLOUR PALETTE",
+                          style: TextStyle(
+                            fontFamily: 'BarlowCondensed',
+                            fontSize: 26,
+                            fontWeight: FontWeight.w300,
+                            color: Color(0xFF242424),
+                            height: 1,
                           ),
-                          child: Text(
-                            scheme.capitalize(),
-                            style: TextStyle(
-                              fontFamily: 'Avenir',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: isSelected ? Colors.white : Colors.black,
+                        ),
+                        const SizedBox(height: 28),
+
+                        /// **Palette Size Selection**
+                        const Text(
+                          "COLOUR PALETTE SIZE",
+                          style: TextStyle(
+                            fontFamily: 'BarlowCondensed',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w300,
+                            color: Color(0xFF5F5A54),
+                          ),
+                        ),
+
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 24),
+                          child: Container(
+                            height: 58,
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.78),
+                              borderRadius: BorderRadius.circular(18),
+                              border:
+                                  Border.all(color: const Color(0xFFE5DDD5)),
+                            ),
+                            child: Row(
+                              children: List.generate(4, (index) {
+                                final size = index + 1;
+                                final isSelected = (size == _paletteSize);
+
+                                return Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() => _paletteSize = size);
+                                    },
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 180),
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? const Color(0xFF242424)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Text(
+                                        size.toString(),
+                                        style: TextStyle(
+                                          fontFamily: 'BarlowCondensed',
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w300,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : const Color(0xFF8A847D),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
 
-            if (_colorTheoryTip != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Text(
-                    _colorTheoryTip!,
-                    style: TextStyle(
-                      fontFamily: 'Avenir',
-                      fontSize: 12,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                ),
-              ),
-
-            /// **Draggable Color Tiles**
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: ReorderableListView(
-                  scrollDirection: Axis.horizontal,
-                  buildDefaultDragHandles: false,
-                  children: List.generate(
-                    _paletteSize,
-                        (i) => _buildColorTileWidget(i, key: ValueKey(i)),
-                  ),
-                  onReorder: (oldIndex, newIndex) {
-                    setState(() {
-                      if (newIndex > oldIndex) {
-                        newIndex -= 1;
-                      }
-                      final ColorTile tile = _palette.removeAt(oldIndex);
-                      _palette.insert(newIndex, tile);
-
-                      // If we're in a color theory mode, update the base color if the first tile changed
-                      if (_selectedColorScheme != 'custom') {
-                        _baseTheoryColor = _palette[0].color;
-                      }
-                    });
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Available wardrobe colors
-
-            /// **Bottom Buttons**
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  /// **Generate Palette Button**
-                  FloatingActionButton.extended(
-                    heroTag: 'generate_btn',
-                    onPressed: _generatePalette,
-                    backgroundColor: Colors.grey[300],
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    label: Text(
-                      _selectedColorScheme == 'custom'
-                          ? "GENERATE"
-                          : "GENERATE ${_selectedColorScheme.toUpperCase()}",
-                      style: const TextStyle(
-                        fontFamily: 'Avenir',
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-
-                  /// **Confirm Button**
-                  FloatingActionButton(
-                    onPressed: () {
-                      // Convert the active color tiles to a List<Color>
-                      final chosenColors = activePalette.map((t) => t.color).toList();
-
-                      // Navigate to CreateOutfitPage with the color palette
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CreateOutfitPage(
-                            colorPalette: chosenColors,
-                            savedOutfits: [],
-                            selectedDate: selectedDate,
+                        /// **Color Theory Selection**
+                        const Text(
+                          "COLOR THEORY",
+                          style: TextStyle(
+                            fontFamily: 'BarlowCondensed',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w300,
+                            color: Color(0xFF5F5A54),
                           ),
                         ),
-                      ).then((result) {
-                        if (result != null) {
-                          Map<String, dynamic> outfitData;
 
-                          if (result is Map<String, dynamic>) {
-                            outfitData = result;
-                            // Make sure we include the date in the returned data
-                            if (!outfitData.containsKey('date') && result.containsKey('outfit')) {
-                              final outfit = result['outfit'];
-                              outfitData['date'] = outfit.date?.toString() ?? selectedDate.toString();
-                            }
-                          } else {
-                            outfitData = {
-                              'name': result.name ?? "Outfit for ${selectedDate.toString().split(' ')[0]}",
-                              'date': result.date?.toString() ?? selectedDate.toString(),
-                              'clothes': result.clothes ?? <String, String?>{},
-                              'accessories': result.accessories ?? <String>[],
-                              'colorPalette': chosenColors,
-                              'userId': _currentUserId, // Add user ID to the outfit
-                            };
-                          }
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: _colorSchemes.map((scheme) {
+                                final isSelected =
+                                    (scheme == _selectedColorScheme);
 
-                          Navigator.pop(context, outfitData);
-                        }
-                      });
-                    },
-                    backgroundColor: Colors.grey[300],
-                    foregroundColor: Colors.black,
-                    child: const Icon(Icons.check, size: 28),
-                    shape: const CircleBorder(),
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(
+                                          () => _selectedColorScheme = scheme);
+                                      if (scheme != 'custom') {
+                                        _generateTheoryBasedPalette();
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 20, vertical: 11),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? const Color(0xFF242424)
+                                            : Colors.white
+                                                .withValues(alpha: 0.82),
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? const Color(0xFF242424)
+                                              : const Color(0xFFE5DDD5),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        scheme.capitalize(),
+                                        style: TextStyle(
+                                          fontFamily: 'BarlowCondensed',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w300,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : const Color(0xFF5F5A54),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+
+                        if (_colorTheoryTip != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.70),
+                                borderRadius: BorderRadius.circular(16),
+                                border:
+                                    Border.all(color: const Color(0xFFE5DDD5)),
+                              ),
+                              child: Text(
+                                _colorTheoryTip!,
+                                style: TextStyle(
+                                  fontFamily: 'BarlowCondensed',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w300,
+                                  color: const Color(0xFF5F5A54),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        /// **Draggable Color Tiles**
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: ReorderableListView(
+                              scrollDirection: Axis.horizontal,
+                              buildDefaultDragHandles: false,
+                              children: List.generate(
+                                _paletteSize,
+                                (i) =>
+                                    _buildColorTileWidget(i, key: ValueKey(i)),
+                              ),
+                              onReorder: (oldIndex, newIndex) {
+                                setState(() {
+                                  if (newIndex > oldIndex) {
+                                    newIndex -= 1;
+                                  }
+                                  final ColorTile tile =
+                                      _palette.removeAt(oldIndex);
+                                  _palette.insert(newIndex, tile);
+
+                                  // If we're in a color theory mode, update the base color if the first tile changed
+                                  if (_selectedColorScheme != 'custom') {
+                                    _baseTheoryColor = _palette[0].color;
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 22,
+                    right: 22,
+                    bottom: DrobeBottomAction.lowActionBottomOffset(context),
+                    child: _buildBottomActions(activePalette),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
       ),
+    );
+  }
+
+  Widget _buildBottomActions(List<ColorTile> activePalette) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        FloatingActionButton.extended(
+          heroTag: 'generate_btn',
+          onPressed: _generatePalette,
+          elevation: 0,
+          focusElevation: 0,
+          hoverElevation: 0,
+          highlightElevation: 0,
+          disabledElevation: 0,
+          backgroundColor: Colors.white.withOpacity(0.72),
+          foregroundColor: const Color(0xFF242424),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          label: Text(
+            _selectedColorScheme == 'custom'
+                ? "GENERATE"
+                : "GENERATE ${_selectedColorScheme.toUpperCase()}",
+            style: const TextStyle(
+              fontFamily: 'BarlowCondensed',
+              fontSize: 17,
+              fontWeight: FontWeight.w300,
+            ),
+          ),
+        ),
+        FloatingActionButton(
+          onPressed: () {
+            final chosenColors = activePalette.map((t) => t.color).toList();
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CreateOutfitPage(
+                  colorPalette: chosenColors,
+                  savedOutfits: [],
+                  selectedDate: selectedDate,
+                ),
+              ),
+            ).then((result) {
+              if (result != null) {
+                Map<String, dynamic> outfitData;
+
+                if (result is Map<String, dynamic>) {
+                  outfitData = result;
+                  if (!outfitData.containsKey('date') &&
+                      result.containsKey('outfit')) {
+                    final outfit = result['outfit'];
+                    outfitData['date'] =
+                        outfit.date?.toString() ?? selectedDate.toString();
+                  }
+                } else {
+                  outfitData = {
+                    'name': result.name ??
+                        "Outfit for ${selectedDate.toString().split(' ')[0]}",
+                    'date': result.date?.toString() ?? selectedDate.toString(),
+                    'clothes': result.clothes ?? <String, String?>{},
+                    'accessories': result.accessories ?? <String>[],
+                    'colorPalette': chosenColors,
+                    'userId': _currentUserId,
+                  };
+                }
+
+                Navigator.pop(context, outfitData);
+              }
+            });
+          },
+          elevation: 0,
+          focusElevation: 0,
+          hoverElevation: 0,
+          highlightElevation: 0,
+          disabledElevation: 0,
+          backgroundColor: const Color(0xFF242424).withOpacity(0.72),
+          foregroundColor: Colors.white,
+          shape: const CircleBorder(),
+          child: const Icon(Icons.check, size: 28),
+        ),
+      ],
     );
   }
 
@@ -618,36 +706,43 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
     // Determine if the background color is light or dark
     final brightness = ThemeData.estimateBrightnessForColor(tile.color);
-    final iconColor = brightness == Brightness.light ? Colors.black : Colors.grey[300];
+    final Color iconColor =
+        brightness == Brightness.light ? Colors.black : Colors.grey.shade300;
+
+    final availableWidth = MediaQuery.of(context).size.width - 44;
+    const tileGap = 8.0;
+    final tileWidth =
+        (availableWidth - tileGap * (_paletteSize - 1)) / _paletteSize;
 
     return ReorderableDragStartListener(
       key: key!,
       index: i,
       child: Container(
-        width: (MediaQuery.of(context).size.width - 48) / _paletteSize,
-        height: 240,
+        width: tileWidth,
+        margin: EdgeInsets.only(right: i == _paletteSize - 1 ? 0 : tileGap),
+        constraints: const BoxConstraints(minHeight: 260),
         decoration: BoxDecoration(
           color: tile.color,
-          borderRadius: BorderRadius.circular(1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             /// **Edit Button (Top)**
-            IconButton(
-              icon: Icon(Icons.edit, color: iconColor),
+            _buildTileIconButton(
+              icon: Icons.edit_outlined,
+              color: iconColor,
               onPressed: () => _editColor(i),
             ),
 
             /// **Drag Handle (Below Edit Button)**
-            Icon(Icons.drag_indicator, color: iconColor, size: 28),
+            Icon(Icons.drag_indicator, color: iconColor, size: 30),
 
             /// **Lock/Unlock Button**
-            IconButton(
-              icon: Icon(
-                tile.isLocked ? Icons.lock : Icons.lock_open,
-                color: iconColor,
-              ),
+            _buildTileIconButton(
+              icon: tile.isLocked ? Icons.lock_outline : Icons.lock_open,
+              color: iconColor,
               onPressed: () {
                 setState(() {
                   tile.isLocked = !tile.isLocked;
@@ -663,8 +758,9 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
                   tile.itemName!,
                   style: TextStyle(
                     color: iconColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
+                    fontFamily: 'BarlowCondensed',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w300,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 1,
@@ -674,6 +770,18 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTileIconButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      padding: EdgeInsets.zero,
+      icon: Icon(icon, color: color, size: 24),
+      onPressed: onPressed,
     );
   }
 
@@ -695,11 +803,13 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _useGreyPalette ? "Select a Grayscale Color" : "Select a Color from Your Wardrobe",
+                _useGreyPalette
+                    ? "Select a Grayscale Color"
+                    : "Select a Color from Your Wardrobe",
                 style: const TextStyle(
-                  fontFamily: 'Avenir',
+                  fontFamily: 'BarlowCondensed',
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w300,
                   color: Colors.black87,
                 ),
               ),
@@ -803,8 +913,7 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         if (!_palette[i].isLocked && colorIndex < availableColors.length) {
           _palette[i] = ColorTile(
               color: availableColors[colorIndex].color,
-              itemName: availableColors[colorIndex].itemName
-          );
+              itemName: availableColors[colorIndex].itemName);
           colorIndex++;
         }
 
@@ -866,9 +975,9 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
       final q = l < 0.5 ? l * (1 + s) : l + s - l * s;
       final p = 2 * l - q;
 
-      r = _hueToRGB(p, q, h + 1/3);
+      r = _hueToRGB(p, q, h + 1 / 3);
       g = _hueToRGB(p, q, h);
-      b = _hueToRGB(p, q, h - 1/3);
+      b = _hueToRGB(p, q, h - 1 / 3);
     }
 
     return Color.fromARGB(
@@ -882,16 +991,17 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
   double _hueToRGB(double p, double q, double t) {
     if (t < 0) t += 1;
     if (t > 1) t -= 1;
-    if (t < 1/6) return p + (q - p) * 6 * t;
-    if (t < 1/2) return q;
-    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
     return p;
   }
 
   // Replace the _generateTheoryBasedPalette method with this updated version that introduces variation
   void _generateTheoryBasedPalette() {
     if (_wardrobeColors.isEmpty) {
-      _showGreyPaletteNotification("No wardrobe colors available for color theory.");
+      _showGreyPaletteNotification(
+          "No wardrobe colors available for color theory.");
       return;
     }
 
@@ -907,7 +1017,9 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         _baseTheoryColor = _palette[baseIndex].color;
       } else {
         // Choose a random color from wardrobe
-        _baseTheoryColor = _wardrobeColors[math.Random().nextInt(_wardrobeColors.length)].color;
+        _baseTheoryColor =
+            _wardrobeColors[math.Random().nextInt(_wardrobeColors.length)]
+                .color;
       }
     }
 
@@ -920,83 +1032,124 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
 
     switch (_selectedColorScheme) {
       case 'monochromatic':
-      // Create variations with same hue, different saturation/lightness
-      // Add randomness to saturation and lightness while keeping the hue constant
+        // Create variations with same hue, different saturation/lightness
+        // Add randomness to saturation and lightness while keeping the hue constant
         newColors = [
           _baseTheoryColor!, // Original color always stays the same
           _hslToColor(
               hsl['h']! / 360,
               math.min(1.0, hsl['s']! * (0.6 + random.nextDouble() * 0.4)),
-              math.min(0.9, hsl['l']! * (1.2 + random.nextDouble() * 0.3))
-          ), // Lighter with randomness
+              math.min(
+                  0.9,
+                  hsl['l']! *
+                      (1.2 +
+                          random.nextDouble() *
+                              0.3))), // Lighter with randomness
           _hslToColor(
               hsl['h']! / 360,
               math.min(1.0, hsl['s']! * (1.0 + random.nextDouble() * 0.4)),
-              math.max(0.1, hsl['l']! * (0.7 + random.nextDouble() * 0.3))
-          ), // Darker with randomness
+              math.max(
+                  0.1,
+                  hsl['l']! *
+                      (0.7 +
+                          random.nextDouble() *
+                              0.3))), // Darker with randomness
           _hslToColor(
               hsl['h']! / 360,
               math.min(1.0, hsl['s']! * (0.4 + random.nextDouble() * 0.3)),
-              math.min(0.95, hsl['l']! * (1.0 + random.nextDouble() * 0.2))
-          ), // Desaturated with randomness
+              math.min(
+                  0.95,
+                  hsl['l']! *
+                      (1.0 +
+                          random.nextDouble() *
+                              0.2))), // Desaturated with randomness
         ];
-        _colorTheoryTip = "Monochromatic: These colors are all variations of the same hue, creating a harmonious and cohesive look.";
+        _colorTheoryTip =
+            "Monochromatic: These colors are all variations of the same hue, creating a harmonious and cohesive look.";
         break;
 
       case 'complementary':
-      // Create a complementary color (opposite on color wheel) and variations
-      // Add slight randomness to the complementary hue
-        double complementaryHue = (hsl['h']! + 180 + (random.nextDouble() * 20 - 10)) % 360;
+        // Create a complementary color (opposite on color wheel) and variations
+        // Add slight randomness to the complementary hue
+        double complementaryHue =
+            (hsl['h']! + 180 + (random.nextDouble() * 20 - 10)) % 360;
         newColors = [
           _baseTheoryColor!, // Original color always stays the same
           _hslToColor(
               complementaryHue / 360,
               math.min(1.0, hsl['s']! * (0.9 + random.nextDouble() * 0.2)),
-              math.min(0.9, hsl['l']! * (0.9 + random.nextDouble() * 0.2))
-          ), // Complementary with slight variation
+              math.min(
+                  0.9,
+                  hsl['l']! *
+                      (0.9 +
+                          random.nextDouble() *
+                              0.2))), // Complementary with slight variation
           _hslToColor(
               hsl['h']! / 360,
               math.min(1.0, hsl['s']! * (0.7 + random.nextDouble() * 0.3)),
-              math.min(0.9, hsl['l']! * (1.1 + random.nextDouble() * 0.2))
-          ), // Lighter original with randomness
+              math.min(
+                  0.9,
+                  hsl['l']! *
+                      (1.1 +
+                          random.nextDouble() *
+                              0.2))), // Lighter original with randomness
           _hslToColor(
               complementaryHue / 360,
               math.min(1.0, hsl['s']! * (0.7 + random.nextDouble() * 0.3)),
-              math.min(0.9, hsl['l']! * (1.1 + random.nextDouble() * 0.2))
-          ), // Lighter complementary with randomness
+              math.min(
+                  0.9,
+                  hsl['l']! *
+                      (1.1 +
+                          random.nextDouble() *
+                              0.2))), // Lighter complementary with randomness
         ];
-        _colorTheoryTip = "Complementary: These colors are opposite each other on the color wheel, creating a vibrant contrast.";
+        _colorTheoryTip =
+            "Complementary: These colors are opposite each other on the color wheel, creating a vibrant contrast.";
         break;
 
       case 'analogous':
-      // Create colors adjacent on the color wheel with some randomness
-        double angle1 = -30 + (random.nextDouble() * 10 - 5); // -35 to -25 degrees
-        double angle2 = 30 + (random.nextDouble() * 10 - 5);  // 25 to 35 degrees
-        double angle3 = 60 + (random.nextDouble() * 10 - 5);  // 55 to 65 degrees
+        // Create colors adjacent on the color wheel with some randomness
+        double angle1 =
+            -30 + (random.nextDouble() * 10 - 5); // -35 to -25 degrees
+        double angle2 = 30 + (random.nextDouble() * 10 - 5); // 25 to 35 degrees
+        double angle3 = 60 + (random.nextDouble() * 10 - 5); // 55 to 65 degrees
 
         newColors = [
           _baseTheoryColor!, // Original color always stays the same
           _hslToColor(
               ((hsl['h']! + angle1) + 360) % 360 / 360,
               math.min(1.0, hsl['s']! * (0.9 + random.nextDouble() * 0.2)),
-              math.min(0.9, hsl['l']! * (0.9 + random.nextDouble() * 0.2))
-          ), // Adjacent with variation
+              math.min(
+                  0.9,
+                  hsl['l']! *
+                      (0.9 +
+                          random.nextDouble() *
+                              0.2))), // Adjacent with variation
           _hslToColor(
               ((hsl['h']! + angle2) + 360) % 360 / 360,
               math.min(1.0, hsl['s']! * (0.9 + random.nextDouble() * 0.2)),
-              math.min(0.9, hsl['l']! * (0.9 + random.nextDouble() * 0.2))
-          ), // Adjacent with variation
+              math.min(
+                  0.9,
+                  hsl['l']! *
+                      (0.9 +
+                          random.nextDouble() *
+                              0.2))), // Adjacent with variation
           _hslToColor(
               ((hsl['h']! + angle3) + 360) % 360 / 360,
               math.min(1.0, hsl['s']! * (0.9 + random.nextDouble() * 0.2)),
-              math.min(0.9, hsl['l']! * (0.9 + random.nextDouble() * 0.2))
-          ), // Adjacent with variation
+              math.min(
+                  0.9,
+                  hsl['l']! *
+                      (0.9 +
+                          random.nextDouble() *
+                              0.2))), // Adjacent with variation
         ];
-        _colorTheoryTip = "Analogous: These colors are adjacent to each other on the color wheel, creating a harmonious and natural look.";
+        _colorTheoryTip =
+            "Analogous: These colors are adjacent to each other on the color wheel, creating a harmonious and natural look.";
         break;
 
       default: // 'custom'
-      // Just use random wardrobe colors
+        // Just use random wardrobe colors
         _generatePalette();
         return;
     }
@@ -1007,7 +1160,9 @@ class _CreatePalettePageState extends State<CreatePalettePage> {
         if (!_palette[i].isLocked && i < newColors.length) {
           _palette[i] = ColorTile(
             color: newColors[i],
-            itemName: i == 0 ? "Base Color" : "${_selectedColorScheme.capitalize()} ${i}",
+            itemName: i == 0
+                ? "Base Color"
+                : "${_selectedColorScheme.capitalize()} ${i}",
           );
         }
       }

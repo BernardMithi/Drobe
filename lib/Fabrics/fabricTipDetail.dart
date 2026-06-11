@@ -6,32 +6,43 @@ class FabricTipDetailPage extends StatelessWidget {
 
   const FabricTipDetailPage({Key? key, required this.tip}) : super(key: key);
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
-          // App bar with image
           SliverAppBar(
-            expandedHeight: 280.0,
+            expandedHeight: 320.0,
             floating: false,
             pinned: true,
             backgroundColor: Colors.white,
-            iconTheme: const IconThemeData(color: Colors.white),
+            foregroundColor: const Color(0xFF242424),
+            surfaceTintColor: Colors.transparent,
+            scrolledUnderElevation: 0,
+            leading: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const BackButton(color: Colors.white),
+              ),
+            ),
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 16, right: 16),
+              titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
               title: Text(
                 tip.title,
                 style: const TextStyle(
+                  fontFamily: 'BarlowCondensed',
                   color: Colors.white,
-                  fontSize: 16.0, // Slightly smaller font size to fit more text
-                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 0.3,
                   shadows: [
-                    Shadow(
-                      offset: Offset(1, 1),
-                      blurRadius: 3,
-                      color: Colors.black54,
-                    ),
+                    Shadow(offset: Offset(0, 1), blurRadius: 6, color: Colors.black54),
                   ],
                 ),
                 maxLines: 2,
@@ -40,30 +51,26 @@ class FabricTipDetailPage extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Hero(
-                    tag: 'tip_image_${tip.id}',
-                    child: Image.network(
-                      tip.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey[200],
-                        child: const Center(
-                          child: Icon(Icons.image_not_supported, size: 64, color: Colors.grey),
-                        ),
+                  Image.network(
+                    tip.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFF2EEE8),
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported, size: 64, color: Color(0xFFBDB5AB)),
                       ),
                     ),
                   ),
-                  // Gradient overlay for better text visibility
-                  Container(
+                  DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withOpacity(0.1),
-                          Colors.black.withOpacity(0.8),
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.72),
                         ],
-                        stops: const [0.5, 1.0],
+                        stops: const [0.45, 1.0],
                       ),
                     ),
                   ),
@@ -71,259 +78,117 @@ class FabricTipDetailPage extends StatelessWidget {
               ),
             ),
           ),
-
-          // Content
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 48),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Author info and date
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.grey[300],
-                          child: Text(
-                            tip.author.substring(0, 1),
-                            style: TextStyle(
-                              color: Colors.grey[800],
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tip.author,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              tip.date,
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Categories
-                  const SizedBox(height: 16),
+                  // Category tags
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: tip.categories.map((category) {
+                    alignment: WrapAlignment.start,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: tip.categories.map((cat) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey[300]!),
+                          color: const Color(0xFFF0F0F0),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFDDDDDD)),
                         ),
                         child: Text(
-                          category,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey[800],
+                          cat,
+                          style: const TextStyle(
+                            fontFamily: 'BarlowCondensed',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w300,
+                            color: Color(0xFF6B6B6B),
                           ),
                         ),
                       );
                     }).toList(),
                   ),
+                  const SizedBox(height: 22),
 
-                  // Description
-                  const SizedBox(height: 24),
+                  // Pull-quote description
                   Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(14),
+                        bottomLeft: Radius.circular(14),
+                        bottomRight: Radius.circular(14),
+                      ),
+                      border: Border(
+                        left: BorderSide(color: Color(0xFFAAAAAA), width: 3),
+                      ),
                     ),
                     child: Text(
                       tip.description,
+                      textAlign: TextAlign.left,
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                        fontFamily: 'BarlowCondensed',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w300,
                         fontStyle: FontStyle.italic,
                         height: 1.6,
-                        letterSpacing: 0.2,
+                        color: Color(0xFF555555),
                       ),
                     ),
                   ),
+                  const SizedBox(height: 28),
 
-                  // Main content - Improved formatting
-                  const SizedBox(height: 24),
+                  // Main article content
                   _buildFormattedContent(tip.content),
 
-                  // Care instructions section
+                  // Care instructions
                   if (tip.careInstructions.isNotEmpty) ...[
-                    const SizedBox(height: 32),
-                    _buildSectionHeader('Care Instructions'),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: tip.careInstructions.map((instruction) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  margin: const EdgeInsets.only(top: 4),
-                                  child: const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
-                                    size: 18,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    instruction,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                    const SizedBox(height: 28),
+                    _buildSectionHeader('Care Guide'),
+                    const SizedBox(height: 14),
+                    ...tip.careInstructions.map(_buildCareItem),
                   ],
 
-                  // Tips section
+                  // Pro tips
                   if (tip.tips.isNotEmpty) ...[
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
                     _buildSectionHeader('Pro Tips'),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: tip.tips.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final tipText = entry.value;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[200],
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '${index + 1}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[800],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    tipText,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                    const SizedBox(height: 14),
+                    ...tip.tips.asMap().entries.map((e) => _buildTipItem(e.value, e.key + 1)),
                   ],
 
                   // Related fabrics
                   if (tip.relatedFabrics.isNotEmpty) ...[
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
                     _buildSectionHeader('Related Fabrics'),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: tip.relatedFabrics.map((fabric) {
-                        return Chip(
-                          label: Text(fabric),
-                          backgroundColor: Colors.grey[200],
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                          labelStyle: TextStyle(
-                            color: Colors.grey[800],
-                            fontSize: 14,
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF2EEE8),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFE4DDD5)),
+                          ),
+                          child: Text(
+                            fabric,
+                            style: const TextStyle(
+                              fontFamily: 'BarlowCondensed',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w300,
+                              color: Color(0xFF5F5A54),
+                            ),
                           ),
                         );
                       }).toList(),
                     ),
                   ],
-
-                  // Bottom padding
-                  const SizedBox(height: 60),
                 ],
               ),
             ),
@@ -334,81 +199,131 @@ class FabricTipDetailPage extends StatelessWidget {
   }
 
   Widget _buildSectionHeader(String title) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Row(
-          children: [
-            const Icon(
-              Icons.article_outlined,
-              color: Colors.grey,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF333333),
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Container(
-          height: 2,
-          width: 60,
-          color: Colors.grey,
+        Container(width: 28, height: 1.5, color: const Color(0xFFAD8B72)),
+        const SizedBox(width: 10),
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            fontFamily: 'BarlowCondensed',
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 1.8,
+            color: Color(0xFF8A847D),
+          ),
         ),
       ],
     );
   }
 
-  // Helper method to build formatted content with proper Markdown-like styling
-  Widget _buildFormattedContent(String content) {
-    final List<String> paragraphs = content.split('\n\n');
+  Widget _buildCareItem(String instruction) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            margin: const EdgeInsets.only(top: 1),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF2E8D8),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(Icons.check, size: 13, color: Color(0xFF8A5E3C)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              instruction,
+              style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF4A4540)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildTipItem(String tipText, int number) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF2E8D8),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '$number',
+                style: const TextStyle(
+                  fontFamily: 'BarlowCondensed',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF8A5E3C),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                tipText,
+                style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF4A4540)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormattedContent(String content) {
+    final paragraphs = content.split('\n\n');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: paragraphs.map((paragraph) {
-        // Check if this is a header (starts with ### or **)
         if (paragraph.trim().startsWith('###')) {
           return Padding(
-            padding: const EdgeInsets.only(top: 24, bottom: 12),
+            padding: const EdgeInsets.only(top: 22, bottom: 10),
             child: Text(
               paragraph.trim().replaceAll('###', '').trim(),
               style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                height: 1.3,
+                fontFamily: 'BarlowCondensed',
+                fontSize: 22,
+                fontWeight: FontWeight.w300,
                 letterSpacing: 0.4,
+                color: Color(0xFF242424),
               ),
             ),
           );
-        }
-        // Check if this is a subheader (starts with **)
-        else if (paragraph.trim().startsWith('**') && paragraph.trim().endsWith('**')) {
+        } else if (paragraph.trim().startsWith('**') && paragraph.trim().endsWith('**')) {
           return Padding(
-            padding: const EdgeInsets.only(top: 20, bottom: 10),
+            padding: const EdgeInsets.only(top: 18, bottom: 8),
             child: Text(
               paragraph.trim().replaceAll('**', '').trim(),
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                height: 1.3,
+                fontFamily: 'BarlowCondensed',
+                fontSize: 19,
+                fontWeight: FontWeight.w300,
                 letterSpacing: 0.3,
+                color: Color(0xFF2C2626),
               ),
             ),
           );
-        }
-        // Check if this is a bullet list (starts with -)
-        else if (paragraph.trim().startsWith('-')) {
-          final listItems = paragraph.split('\n').where((line) => line.trim().isNotEmpty).toList();
-
+        } else if (paragraph.trim().startsWith('-')) {
+          final listItems = paragraph.split('\n').where((l) => l.trim().isNotEmpty).toList();
           return Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 16, left: 8),
+            padding: const EdgeInsets.only(top: 8, bottom: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: listItems.map((item) {
@@ -417,23 +332,19 @@ class FabricTipDetailPage extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '•',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          height: 1.4,
+                      Container(
+                        width: 5,
+                        height: 5,
+                        margin: const EdgeInsets.only(top: 8, right: 10),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFAD8B72),
+                          shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           item.replaceFirst('-', '').trim(),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            height: 1.5,
-                            letterSpacing: 0.2,
-                          ),
+                          style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF4A4540)),
                         ),
                       ),
                     ],
@@ -442,19 +353,12 @@ class FabricTipDetailPage extends StatelessWidget {
               }).toList(),
             ),
           );
-        }
-        // Regular paragraph
-        else {
+        } else {
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Text(
               paragraph.trim(),
-              style: const TextStyle(
-                fontSize: 16,
-                height: 1.8,
-                letterSpacing: 0.3,
-                color: Color(0xFF2C2C2C),
-              ),
+              style: const TextStyle(fontSize: 15, height: 1.8, color: Color(0xFF4A4540)),
             ),
           );
         }

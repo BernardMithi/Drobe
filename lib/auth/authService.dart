@@ -68,7 +68,8 @@ class AuthService with ChangeNotifier {
           _userEmail = _currentUserData!['email'];
           _userName = _currentUserData!['name'];
 
-          debugPrint('Restored login session for user ID: $savedUserId, Email: $_userEmail, Name: $_userName');
+          debugPrint(
+              'Restored login session for user ID: $savedUserId, Email: $_userEmail, Name: $_userName');
         } else {
           // User data not found, clear the saved ID
           await prefs.remove(CURRENT_USER_ID_KEY);
@@ -157,7 +158,8 @@ class AuthService with ChangeNotifier {
 
       for (var key in box.keys) {
         final user = box.get(key);
-        if (user != null && user['email'].toString().toLowerCase() == email.toLowerCase()) {
+        if (user != null &&
+            user['email'].toString().toLowerCase() == email.toLowerCase()) {
           userData = Map<String, dynamic>.from(user);
           userId = key.toString();
           break;
@@ -194,7 +196,8 @@ class AuthService with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(CURRENT_USER_ID_KEY, userId!);
 
-      debugPrint('Login successful for user: $email, ID: $userId, Name: $_userName');
+      debugPrint(
+          'Login successful for user: $email, ID: $userId, Name: $_userName');
 
       // Notify listeners that auth state has changed
       notifyListeners();
@@ -266,7 +269,8 @@ class AuthService with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(CURRENT_USER_ID_KEY, userId);
 
-      debugPrint('AuthService: User registered successfully: $email, name: $_userName, ID: $_userId');
+      debugPrint(
+          'AuthService: User registered successfully: $email, name: $_userName, ID: $_userId');
 
       // Notify listeners that auth state has changed
       notifyListeners();
@@ -300,7 +304,8 @@ class AuthService with ChangeNotifier {
       for (var key in usersBox.keys) {
         final userData = usersBox.get(key);
         if (userData != null) {
-          debugPrint('User ID: $key, Email: ${userData['email']}, Name: ${userData['name']}');
+          debugPrint(
+              'User ID: $key, Email: ${userData['email']}, Name: ${userData['name']}');
         }
       }
 
@@ -322,7 +327,8 @@ class AuthService with ChangeNotifier {
 
       for (var key in box.keys) {
         final user = box.get(key);
-        if (user != null && user['email'].toString().toLowerCase() == email.toLowerCase()) {
+        if (user != null &&
+            user['email'].toString().toLowerCase() == email.toLowerCase()) {
           return true; // Email exists
         }
       }
@@ -350,7 +356,8 @@ class AuthService with ChangeNotifier {
 
       for (var key in usersBox.keys) {
         final user = usersBox.get(key);
-        if (user != null && user['email'].toString().toLowerCase() == email.toLowerCase()) {
+        if (user != null &&
+            user['email'].toString().toLowerCase() == email.toLowerCase()) {
           userId = key.toString();
           userData = Map<String, dynamic>.from(user);
           break;
@@ -377,7 +384,8 @@ class AuthService with ChangeNotifier {
   }
 
   // Change password
-  Future<bool> changePassword(String currentPassword, String newPassword) async {
+  Future<bool> changePassword(
+      String currentPassword, String newPassword) async {
     try {
       _isLoading = true;
       notifyListeners();
@@ -402,7 +410,8 @@ class AuthService with ChangeNotifier {
 
       // Verify current password
       if (userData['password'] != currentPassword) {
-        debugPrint('AuthService: Password change failed: Current password is incorrect');
+        debugPrint(
+            'AuthService: Password change failed: Current password is incorrect');
         return false;
       }
 
@@ -475,13 +484,15 @@ class AuthService with ChangeNotifier {
       if (!emailExists) {
         debugPrint('AuthService: Password reset failed: Email not found');
         // Still return true for security reasons (don't reveal if email exists)
-        await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
+        await Future.delayed(
+            const Duration(seconds: 1)); // Simulate network delay
         return true;
       }
 
       // In a real app, you would send a reset email
       // For now, we'll just simulate success
-      await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
+      await Future.delayed(
+          const Duration(seconds: 1)); // Simulate network delay
 
       debugPrint('AuthService: Password reset email sent to: $email');
       return true;
@@ -500,7 +511,8 @@ class AuthService with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      debugPrint('AuthService: Profile update attempt - name: $name, email: $email');
+      debugPrint(
+          'AuthService: Profile update attempt - name: $name, email: $email');
 
       if (!_isLoggedIn || _userId == null) {
         debugPrint('AuthService: Cannot update profile: User not logged in');
@@ -519,11 +531,13 @@ class AuthService with ChangeNotifier {
       final userData = Map<String, dynamic>.from(usersBox.get(_userId!) ?? {});
 
       // Check if email is being changed and if it already exists
-      if (email.isNotEmpty && email.toLowerCase() != userData['email'].toString().toLowerCase()) {
+      if (email.isNotEmpty &&
+          email.toLowerCase() != userData['email'].toString().toLowerCase()) {
         bool emailExists = await checkEmailExists(email);
 
         if (emailExists) {
-          debugPrint('AuthService: Profile update failed: Email already exists');
+          debugPrint(
+              'AuthService: Profile update failed: Email already exists');
           return false;
         }
 
@@ -566,7 +580,8 @@ class AuthService with ChangeNotifier {
     if (!_isInitialized) {
       final initialized = await initialize();
       if (!initialized) {
-        debugPrint('Warning: Failed to initialize AuthService in getCurrentUser');
+        debugPrint(
+            'Warning: Failed to initialize AuthService in getCurrentUser');
         return {
           'id': '',
           'email': '',
@@ -583,9 +598,11 @@ class AuthService with ChangeNotifier {
         'email': '',
         'name': '',
       };
-    };
+    }
+    ;
 
-    debugPrint('getCurrentUser returning: ID: $_userId, Email: $_userEmail, Name: $_userName');
+    debugPrint(
+        'getCurrentUser returning: ID: $_userId, Email: $_userEmail, Name: $_userName');
 
     return {
       'id': _userId ?? '',
@@ -606,7 +623,8 @@ class AuthService with ChangeNotifier {
 
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final profileImagePath = path.join(directory.path, 'profile_$_userId.jpg');
+      final profileImagePath =
+          path.join(directory.path, 'profile_$_userId.jpg');
       final file = File(profileImagePath);
 
       if (await file.exists()) {
@@ -632,7 +650,8 @@ class AuthService with ChangeNotifier {
 
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final profileImagePath = path.join(directory.path, 'profile_$_userId.jpg');
+      final profileImagePath =
+          path.join(directory.path, 'profile_$_userId.jpg');
 
       // Copy the image file to the profile image path
       await imageFile.copy(profileImagePath);
@@ -678,7 +697,8 @@ class AuthService with ChangeNotifier {
 }
 
 extension AuthServiceExtension on AuthService {
-  Future<String> createUserDirectly(String name, String email, String password) async {
+  Future<String> createUserDirectly(
+      String name, String email, String password) async {
     try {
       // Open the users box
       final usersBox = await Hive.openBox(AuthService.USERS_BOX_NAME);
@@ -731,4 +751,3 @@ extension AuthServiceExtension on AuthService {
     }
   }
 }
-

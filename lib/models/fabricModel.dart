@@ -142,16 +142,16 @@ class FabricTip {
   @override
   int get hashCode {
     return id.hashCode ^
-    title.hashCode ^
-    description.hashCode ^
-    content.hashCode ^
-    imageUrl.hashCode ^
-    categories.hashCode ^
-    author.hashCode ^
-    date.hashCode ^
-    careInstructions.hashCode ^
-    tips.hashCode ^
-    relatedFabrics.hashCode;
+        title.hashCode ^
+        description.hashCode ^
+        content.hashCode ^
+        imageUrl.hashCode ^
+        categories.hashCode ^
+        author.hashCode ^
+        date.hashCode ^
+        careInstructions.hashCode ^
+        tips.hashCode ^
+        relatedFabrics.hashCode;
   }
 }
 
@@ -171,23 +171,27 @@ class FabricTipRepository {
 
   /// Returns tips filtered by category.
   static List<FabricTip> getByCategory(String category) {
-    return fabricTips.where((tip) =>
-        tip.categories.contains(category.toLowerCase())).toList();
+    return fabricTips
+        .where((tip) => tip.categories.contains(category.toLowerCase()))
+        .toList();
   }
 
   /// Returns tips by a specific author.
   static List<FabricTip> getByAuthor(String author) {
-    return fabricTips.where((tip) =>
-    tip.author.toLowerCase() == author.toLowerCase()).toList();
+    return fabricTips
+        .where((tip) => tip.author.toLowerCase() == author.toLowerCase())
+        .toList();
   }
 
   /// Searches tips by query string in title, description, or content.
   static List<FabricTip> search(String query) {
     final lowercaseQuery = query.toLowerCase();
-    return fabricTips.where((tip) =>
-    tip.title.toLowerCase().contains(lowercaseQuery) ||
-        tip.description.toLowerCase().contains(lowercaseQuery) ||
-        tip.content.toLowerCase().contains(lowercaseQuery)).toList();
+    return fabricTips
+        .where((tip) =>
+            tip.title.toLowerCase().contains(lowercaseQuery) ||
+            tip.description.toLowerCase().contains(lowercaseQuery) ||
+            tip.content.toLowerCase().contains(lowercaseQuery))
+        .toList();
   }
 
   /// Returns all unique categories across all tips.
@@ -205,8 +209,10 @@ final List<FabricTip> fabricTips = [
   FabricTip(
     id: '1',
     title: 'How to Care for Cotton Garments',
-    description: 'Learn the best practices for washing, drying, and storing your cotton clothes to keep them looking fresh and new.',
-    imageUrl: 'https://images.unsplash.com/photo-1554967651-3997ad1c43b0?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Nnx8Y290dG9uJTIwY2xvdGhlc3xlbnwwfHwwfHx8MA%3D%3D',
+    description:
+        'Learn the best practices for washing, drying, and storing your cotton clothes to keep them looking fresh and new.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1554967651-3997ad1c43b0?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Nnx8Y290dG9uJTIwY2xvdGhlc3xlbnwwfHwwfHx8MA%3D%3D',
     categories: ['cotton', 'washing', 'care'],
     author: 'Emma Johnson',
     date: 'May 15, 2023',
@@ -235,80 +241,13 @@ Different types of cotton require slightly different care approaches. For exampl
     ],
     relatedFabrics: ['Linen', 'Hemp', 'Denim', 'Canvas'],
   ),
-
-  FabricTip(
-    id: '2',
-    title: 'The Ultimate Guide to Wool Care',
-    description: 'Everything you need to know about maintaining wool garments, from washing to storage and dealing with common issues.',
-    imageUrl: 'https://images.unsplash.com/photo-1604644401890-0bd678c83788?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-    categories: ['wool', 'sweaters', 'winter', 'care'],
-    author: 'Michael Chen',
-    date: 'October 3, 2023',
-    content: '''
-Wool is a remarkable natural fiber that offers exceptional warmth, breathability, and durability. With proper care, wool garments can last for many years, becoming cherished wardrobe staples.
-
-Wool comes from various animals, including sheep (merino, lambswool), goats (cashmere, mohair), alpacas, and rabbits (angora). Each type has unique properties, but all wool fibers share certain characteristics that influence how they should be cared for.
-
-One of wool's most impressive qualities is its natural ability to repel stains and odors. The outer layer of wool fibers contains lanolin, a natural oil that helps resist dirt and moisture. This means wool garments often need less frequent washing than other fabrics.
-
-Wool is also naturally elastic, allowing it to return to its original shape after being stretched. However, improper washing or drying can damage this elasticity, leading to shrinkage or distortion.
-''',
-    careInstructions: [
-      'Hand wash wool in lukewarm water with a gentle detergent specifically formulated for wool.',
-      'Never wring or twist wool garments as this can damage the fibers.',
-      'Lay wool items flat to dry on a clean towel, reshaping them to their original dimensions.',
-      'Store wool garments folded in a cool, dry place with cedar blocks to deter moths.',
-      'Allow wool items to rest between wearings to let the fibers recover.',
-    ],
-    tips: [
-      'For minor stains, spot clean with a damp cloth rather than washing the entire garment.',
-      'Steam instead of ironing wool whenever possible to remove wrinkles.',
-      'Brush wool coats and suits with a soft clothes brush to remove surface dirt and revive the nap.',
-      'Use a lint roller or fabric shaver to remove pills that develop on wool garments.',
-      'Consider professional dry cleaning for structured wool items like suits and coats.',
-    ],
-    relatedFabrics: ['Cashmere', 'Merino', 'Alpaca', 'Mohair'],
-  ),
-
-  FabricTip(
-    id: '3',
-    title: 'Silk Care: Preserving Luxury',
-    description: 'Master the art of caring for silk garments to maintain their luxurious feel and appearance for years to come.',
-    imageUrl: 'https://images.unsplash.com/photo-1645654731316-a350fdcf3bae?q=80&w=3774&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    categories: ['silk', 'luxury', 'delicate', 'care'],
-    author: 'Sophia Williams',
-    date: 'July 12, 2023',
-    content: '''
-Silk is one of the most luxurious and delicate fabrics, known for its smooth texture, natural sheen, and cooling properties. Proper care is essential to preserve its beauty and extend its lifespan.
-
-Silk is a natural protein fiber produced by silkworms. Its unique triangular prism-like structure allows silk fibers to refract incoming light at different angles, giving silk its characteristic shimmering appearance.
-
-Despite its delicate nature, silk is surprisingly strong. In fact, the tensile strength of silk is comparable to that of steel wire of the same diameter. However, silk is highly sensitive to heat, sunlight, and certain chemicals, which can damage the fibers and cause discoloration or deterioration.
-
-One of silk's most appealing qualities is its ability to regulate temperature, keeping you cool in summer and warm in winter. It's also naturally hypoallergenic and resistant to dust mites, making it an excellent choice for those with sensitive skin or allergies.
-''',
-    careInstructions: [
-      'Hand wash silk in cold water using a mild detergent specifically designed for delicate fabrics.',
-      'Never use bleach or products containing enzymes on silk.',
-      'Rinse thoroughly to remove all soap residue, which can damage silk fibers.',
-      'Roll silk items in a clean towel to remove excess water, then lay flat to dry away from direct sunlight.',
-      'Store silk garments in a cool, dry place, preferably hanging to prevent wrinkles.',
-    ],
-    tips: [
-      'Test any stain remover on an inconspicuous area before applying it to a visible part of the garment.',
-      'Iron silk on the lowest setting while still slightly damp, using a pressing cloth between the iron and the fabric.',
-      'Avoid spraying perfume or deodorant directly onto silk as the alcohol and chemicals can cause staining.',
-      'For structured silk garments like dresses or blouses, consider professional dry cleaning.',
-      'Rotate your silk items to give them time to recover between wearings.',
-    ],
-    relatedFabrics: ['Satin', 'Chiffon', 'Charmeuse', 'Habotai'],
-  ),
-
   FabricTip(
     id: '4',
     title: 'Denim Care: Keeping Your Jeans Perfect',
-    description: 'Learn how to wash, dry, and maintain your denim to achieve the perfect fit and extend the life of your favorite jeans.',
-    imageUrl: 'https://images.unsplash.com/photo-1565084888279-aca607ecce0c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+    description:
+        'Learn how to wash, dry, and maintain your denim to achieve the perfect fit and extend the life of your favorite jeans.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1565084888279-aca607ecce0c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
     categories: ['denim', 'jeans', 'casual', 'care'],
     author: 'James Wilson',
     date: 'August 28, 2023',
@@ -337,12 +276,83 @@ However, improper care can lead to premature fading, shrinkage, or damage to the
     ],
     relatedFabrics: ['Chambray', 'Twill', 'Canvas', 'Corduroy'],
   ),
+  FabricTip(
+    id: '2',
+    title: 'The Ultimate Guide to Wool Care',
+    description:
+        'Everything you need to know about maintaining wool garments, from washing to storage and dealing with common issues.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1604644401890-0bd678c83788?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+    categories: ['wool', 'sweaters', 'winter', 'care'],
+    author: 'Michael Chen',
+    date: 'October 3, 2023',
+    content: '''
+Wool is a remarkable natural fiber that offers exceptional warmth, breathability, and durability. With proper care, wool garments can last for many years, becoming cherished wardrobe staples.
 
+Wool comes from various animals, including sheep (merino, lambswool), goats (cashmere, mohair), alpacas, and rabbits (angora). Each type has unique properties, but all wool fibers share certain characteristics that influence how they should be cared for.
+
+One of wool's most impressive qualities is its natural ability to repel stains and odors. The outer layer of wool fibers contains lanolin, a natural oil that helps resist dirt and moisture. This means wool garments often need less frequent washing than other fabrics.
+
+Wool is also naturally elastic, allowing it to return to its original shape after being stretched. However, improper washing or drying can damage this elasticity, leading to shrinkage or distortion.
+''',
+    careInstructions: [
+      'Hand wash wool in lukewarm water with a gentle detergent specifically formulated for wool.',
+      'Never wring or twist wool garments as this can damage the fibers.',
+      'Lay wool items flat to dry on a clean towel, reshaping them to their original dimensions.',
+      'Store wool garments folded in a cool, dry place with cedar blocks to deter moths.',
+      'Allow wool items to rest between wearings to let the fibers recover.',
+    ],
+    tips: [
+      'For minor stains, spot clean with a damp cloth rather than washing the entire garment.',
+      'Steam instead of ironing wool whenever possible to remove wrinkles.',
+      'Brush wool coats and suits with a soft clothes brush to remove surface dirt and revive the nap.',
+      'Use a lint roller or fabric shaver to remove pills that develop on wool garments.',
+      'Consider professional dry cleaning for structured wool items like suits and coats.',
+    ],
+    relatedFabrics: ['Cashmere', 'Merino', 'Alpaca', 'Mohair'],
+  ),
+  FabricTip(
+    id: '3',
+    title: 'Silk Care: Preserving Luxury',
+    description:
+        'Master the art of caring for silk garments to maintain their luxurious feel and appearance for years to come.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1645654731316-a350fdcf3bae?q=80&w=3774&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    categories: ['silk', 'luxury', 'delicate', 'care'],
+    author: 'Sophia Williams',
+    date: 'July 12, 2023',
+    content: '''
+Silk is one of the most luxurious and delicate fabrics, known for its smooth texture, natural sheen, and cooling properties. Proper care is essential to preserve its beauty and extend its lifespan.
+
+Silk is a natural protein fiber produced by silkworms. Its unique triangular prism-like structure allows silk fibers to refract incoming light at different angles, giving silk its characteristic shimmering appearance.
+
+Despite its delicate nature, silk is surprisingly strong. In fact, the tensile strength of silk is comparable to that of steel wire of the same diameter. However, silk is highly sensitive to heat, sunlight, and certain chemicals, which can damage the fibers and cause discoloration or deterioration.
+
+One of silk's most appealing qualities is its ability to regulate temperature, keeping you cool in summer and warm in winter. It's also naturally hypoallergenic and resistant to dust mites, making it an excellent choice for those with sensitive skin or allergies.
+''',
+    careInstructions: [
+      'Hand wash silk in cold water using a mild detergent specifically designed for delicate fabrics.',
+      'Never use bleach or products containing enzymes on silk.',
+      'Rinse thoroughly to remove all soap residue, which can damage silk fibers.',
+      'Roll silk items in a clean towel to remove excess water, then lay flat to dry away from direct sunlight.',
+      'Store silk garments in a cool, dry place, preferably hanging to prevent wrinkles.',
+    ],
+    tips: [
+      'Test any stain remover on an inconspicuous area before applying it to a visible part of the garment.',
+      'Iron silk on the lowest setting while still slightly damp, using a pressing cloth between the iron and the fabric.',
+      'Avoid spraying perfume or deodorant directly onto silk as the alcohol and chemicals can cause staining.',
+      'For structured silk garments like dresses or blouses, consider professional dry cleaning.',
+      'Rotate your silk items to give them time to recover between wearings.',
+    ],
+    relatedFabrics: ['Satin', 'Chiffon', 'Charmeuse', 'Habotai'],
+  ),
   FabricTip(
     id: '5',
     title: 'Caring for Synthetic Fabrics',
-    description: 'Discover the best methods for maintaining polyester, nylon, and other synthetic fabrics to keep your activewear and everyday clothes in top condition.',
-    imageUrl: 'https://images.unsplash.com/photo-1593032580308-d4bafafc4f28?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+    description:
+        'Discover the best methods for maintaining polyester, nylon, and other synthetic fabrics to keep your activewear and everyday clothes in top condition.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1593032580308-d4bafafc4f28?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
     categories: ['synthetic', 'polyester', 'activewear', 'care'],
     author: 'Alex Rodriguez',
     date: 'September 5, 2023',
@@ -371,12 +381,13 @@ Modern technical fabrics often blend different synthetic fibers or combine synth
     ],
     relatedFabrics: ['Polyester', 'Nylon', 'Acrylic', 'Spandex', 'Microfiber'],
   ),
-
   FabricTip(
     id: '6',
     title: 'Leather Care Essentials',
-    description: 'Essential tips for cleaning, conditioning, and protecting leather garments and accessories to ensure they age beautifully.',
-    imageUrl: 'https://images.unsplash.com/photo-1531938716357-224c16b5ace3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+    description:
+        'Essential tips for cleaning, conditioning, and protecting leather garments and accessories to ensure they age beautifully.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1531938716357-224c16b5ace3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
     categories: ['leather', 'accessories', 'care'],
     author: 'Daniel Brown',
     date: 'November 10, 2023',
@@ -405,12 +416,13 @@ One of the most appealing aspects of leather is how it develops character over t
     ],
     relatedFabrics: ['Suede', 'Nubuck', 'Faux Leather', 'Vegan Leather'],
   ),
-
   FabricTip(
     id: '7',
     title: 'Linen Care: Maintaining Natural Elegance',
-    description: 'Learn how to properly wash, iron, and store linen garments to preserve their natural texture and breathability.',
-    imageUrl: 'https://images.unsplash.com/photo-1693443688057-85f57b872a3c?q=80&w=3687&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    description:
+        'Learn how to properly wash, iron, and store linen garments to preserve their natural texture and breathability.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1693443688057-85f57b872a3c?q=80&w=3687&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     categories: ['linen', 'summer', 'natural', 'care'],
     author: 'Olivia Parker',
     date: 'June 18, 2023',
@@ -439,12 +451,13 @@ Linen is exceptionally durable and becomes softer and more luminous with each wa
     ],
     relatedFabrics: ['Cotton', 'Hemp', 'Ramie', 'Flax'],
   ),
-
   FabricTip(
     id: '8',
     title: 'Cashmere Care: Preserving Luxury and Softness',
-    description: 'Expert advice on how to wash, store, and maintain cashmere garments to keep them soft, luxurious, and pill-free for years.',
-    imageUrl: 'https://images.unsplash.com/photo-1632773004171-02bc1c4a726a?q=80&w=3732&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+    description:
+        'Expert advice on how to wash, store, and maintain cashmere garments to keep them soft, luxurious, and pill-free for years.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1632773004171-02bc1c4a726a?q=80&w=3732&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     categories: ['cashmere', 'luxury', 'winter', 'care'],
     author: 'Natalie Kim',
     date: 'December 5, 2023',
@@ -473,12 +486,13 @@ Despite its delicate feel, cashmere is relatively durable when properly cared fo
     ],
     relatedFabrics: ['Merino Wool', 'Alpaca', 'Mohair', 'Pashmina'],
   ),
-
   FabricTip(
     id: '9',
     title: 'Building a Capsule Wardrobe: Quality Over Quantity',
-    description: 'How to create a versatile, sustainable wardrobe with fewer, better pieces that work together seamlessly.',
-    imageUrl: 'https://images.unsplash.com/photo-1560243563-062bfc001d68?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+    description:
+        'How to create a versatile, sustainable wardrobe with fewer, better pieces that work together seamlessly.',
+    imageUrl:
+        'https://images.unsplash.com/photo-1560243563-062bfc001d68?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
     categories: ['capsule wardrobe', 'minimalism', 'sustainability', 'fashion'],
     author: 'Harper Lee',
     date: 'January 15, 2024',

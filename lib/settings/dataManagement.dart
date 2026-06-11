@@ -23,102 +23,110 @@ class _DataManagementPageState extends State<DataManagementPage> {
       ),
       body: _isLoading
           ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(_statusMessage.isNotEmpty ? _statusMessage : 'Clearing data...'),
-          ],
-        ),
-      )
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(_statusMessage.isNotEmpty
+                      ? _statusMessage
+                      : 'Clearing data...'),
+                ],
+              ),
+            )
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Reset Options',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Choose how you want to reset your app data.',
-              style: TextStyle(
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Reset Content Only
-            _buildResetOption(
-              title: 'Reset Content Only',
-              description: 'Clear all your items, outfits, and preferences while staying logged in.',
-              icon: Icons.refresh,
-              color: Colors.blue,
-              onTap: () => _showResetConfirmation(
-                title: 'Reset Content Only?',
-                content: 'This will clear all your items, outfits, and preferences. Your account will remain active and you will stay logged in. This action cannot be undone.',
-                clearUserAuth: false,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Factory Reset
-            _buildResetOption(
-              title: 'Factory Reset',
-              description: 'Clear everything including your account information. You will need to log in again.',
-              icon: Icons.delete_forever,
-              color: Colors.red,
-              onTap: () => _showResetConfirmation(
-                title: 'Factory Reset?',
-                content: 'This will clear ALL data including your account information. You will be signed out and need to log in again. This action cannot be undone.',
-                clearUserAuth: true,
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Information section
-            Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'What gets deleted?',
+                children: [
+                  const Text(
+                    'Reset Options',
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w300,
                     ),
                   ),
-                  SizedBox(height: 8),
-                  Text('• Content Reset: All items, outfits, lookbook entries, laundry items, and preferences'),
-                  SizedBox(height: 4),
-                  Text('• Factory Reset: Everything above plus your account information'),
-                  SizedBox(height: 16),
-                  Text(
-                    'Note: This only affects data on this device. If you have synced data to the cloud, you may need to delete that separately.',
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Choose how you want to reset your app data.',
                     style: TextStyle(
-                      fontStyle: FontStyle.italic,
-                      fontSize: 12,
                       color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Reset Content Only
+                  _buildResetOption(
+                    title: 'Reset Content Only',
+                    description:
+                        'Clear all your items, outfits, and preferences while staying logged in.',
+                    icon: Icons.refresh,
+                    color: Colors.blue,
+                    onTap: () => _showResetConfirmation(
+                      title: 'Reset Content Only?',
+                      content:
+                          'This will clear all your items, outfits, and preferences. Your account will remain active and you will stay logged in. This action cannot be undone.',
+                      clearUserAuth: false,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Factory Reset
+                  _buildResetOption(
+                    title: 'Factory Reset',
+                    description:
+                        'Clear everything including your account information. You will need to log in again.',
+                    icon: Icons.delete_forever,
+                    color: Colors.red,
+                    onTap: () => _showResetConfirmation(
+                      title: 'Factory Reset?',
+                      content:
+                          'This will clear ALL data including your account information. You will be signed out and need to log in again. This action cannot be undone.',
+                      clearUserAuth: true,
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Information section
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'What gets deleted?',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w300,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                            '• Content Reset: All items, outfits, lookbook entries, laundry items, and preferences'),
+                        SizedBox(height: 4),
+                        Text(
+                            '• Factory Reset: Everything above plus your account information'),
+                        SizedBox(height: 16),
+                        Text(
+                          'Note: This only affects data on this device. If you have synced data to the cloud, you may need to delete that separately.',
+                          style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -165,7 +173,7 @@ class _DataManagementPageState extends State<DataManagementPage> {
                     Text(
                       title,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w300,
                         fontSize: 16,
                       ),
                     ),
@@ -239,11 +247,14 @@ class _DataManagementPageState extends State<DataManagementPage> {
       });
 
       // Clear the data with a timeout
-      await Future.delayed(const Duration(milliseconds: 500)); // Small delay for UI feedback
+      await Future.delayed(
+          const Duration(milliseconds: 500)); // Small delay for UI feedback
 
-      await hiveManager.clearAllData(clearUserAuth: clearUserAuth)
+      await hiveManager
+          .clearAllData(clearUserAuth: clearUserAuth)
           .timeout(const Duration(seconds: 30), onTimeout: () {
-        debugPrint('Data clearing operation timed out, but may have partially succeeded');
+        debugPrint(
+            'Data clearing operation timed out, but may have partially succeeded');
         throw TimeoutException('Operation timed out');
       });
 
@@ -280,7 +291,8 @@ class _DataManagementPageState extends State<DataManagementPage> {
         }
 
         // Navigate to login screen
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/login', (route) => false);
       } else {
         // Just go back to settings
         Navigator.of(context).pop();
@@ -303,4 +315,3 @@ class _DataManagementPageState extends State<DataManagementPage> {
     }
   }
 }
-
